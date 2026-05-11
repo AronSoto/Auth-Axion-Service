@@ -1,0 +1,118 @@
+// =============================================================================
+// Auth-Axion Prisma schema
+//
+// Models:
+//   - User                 The end-user account (canonical identity).
+//   - Account              Linked OAuth provider accounts (one User : many Account).
+//   - RefreshToken         Hashed refresh tokens — one row per active session/device.
+//                          Rotated on each refresh; the old row is revoked.
+//   - VerificationToken    One-time tokens for email verification + password reset.
+//   - Role                 RBAC role bound to a User.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+  GITHUB
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum VerificationTokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  emailVerifiedAt DateTime?
+  name            String?
+  avatarUrl       String?
+  passwordHash    String?  // null when account is OAuth-only
+
+  role            UserRole @default(USER)
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  accounts           Account[]
+  refreshTokens      RefreshToken[]
+  verificationTokens VerificationToken[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Account {
+  id                String       @id @default(cuid())
+  provider          AuthProvider
+  providerAccountId String       // the user's id at Google/GitHub
+
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Optional OAuth tokens (encrypted in production via app-level layer if you choose to store them)
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model RefreshToken {
+  id             String    @id @default(cuid())
+  // We store the hash of the refresh token, never the token itself.
+  tokenHash      String    @unique
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Rotation chain — the token that replaced this one (if any).
+  replacedByHash String?
+  revokedAt      DateTime?
+
+  // Device / session metadata for visibility ("manage active sessions").
+  userAgent      String?
+  ipAddress      String?
+
+  expiresAt      DateTime
+  createdAt      DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model VerificationToken {
+  id        String                @id @default(cuid())
+  tokenHash String                @unique
+  type      VerificationTokenType
+  userId    String
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime              @default(now())
+
+  @@index([userId, type])
+  @@index([expiresAt])
+  @@map("verification_tokens")
+}

@@ -1,0 +1,64 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Environment files — NEVER commit real secrets
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+!.env.example
+!apps/web/.env.local.example
+
+# Secrets (belt-and-suspenders — even if someone misnames a file)
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+secrets/
+.secrets
+credentials.json
+service-account*.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# IDE / editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prisma
+apps/api/prisma/migrations/dev.db
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+
+# Misc
+.cache/
+.husky/_/
+.agents/
+skills-lock.json

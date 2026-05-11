@@ -1,0 +1,30 @@
+import { Controller, Get } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+
+import { Public } from '@/common/decorators/public.decorator';
+import { PrismaService } from '@/prisma/prisma.service';
+
+@ApiTags('health')
+@Controller('health')
+export class HealthController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Public()
+  @Get()
+  @ApiOperation({ summary: 'Liveness probe' })
+  liveness(): { status: 'ok'; uptime: number } {
+    return { status: 'ok', uptime: process.uptime() };
+  }
+
+  @Public()
+  @Get('ready')
+  @ApiOperation({ summary: 'Readiness probe — checks the DB connection' })
+  async readiness(): Promise<{ status: 'ok' | 'degraded'; db: 'up' | 'down' }> {
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      return { status: 'ok', db: 'up' };
+    } catch {
+      return { status: 'degraded', db: 'down' };
+    }
+  }
+}
