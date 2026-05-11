@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="docs/logo.png" alt="Auth Axion" width="400" />
+  <img src="docs/Logo.png" alt="Auth Axion" width="400" />
 </p>
-
-<h1 align="center">Auth Axion Service</h1>
 
 <p align="center">
   <em>A production-shaped, standalone authentication service.</em>
