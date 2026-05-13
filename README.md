@@ -26,8 +26,9 @@
 Every concern (token rotation, OAuth account linking, email delivery, RBAC) lives in its own well-named file. The companion Next.js frontend is intentionally minimal: a landing page + login + dashboard, just enough to demo every backend flow end-to-end.
 
 <p align="center">
-  <img src="docs/Presentation.gif" alt="Axion Gif" width="400" />
+  <img src="docs/Presentation.gif" alt="Axion Gif" width="800" />
 </p>
+
 ---
 
 ## 🧱 Stack
