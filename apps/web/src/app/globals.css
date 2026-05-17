@@ -98,6 +98,38 @@ body {
   animation: fade-up 0.5s ease-out both;
 }
 
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-overlay-in {
+  animation: overlay-in 200ms ease-out both;
+}
+.animate-panel-in {
+  animation: panel-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-overlay-in,
+  .animate-panel-in {
+    animation-duration: 0.001ms;
+  }
+}
+
 /* Staggered reveal — children get sequential 60ms delays */
 .stagger > * {
   animation: fade-up 0.5s ease-out both;

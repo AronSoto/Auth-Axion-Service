@@ -13,14 +13,15 @@
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
-    "prisma:generate": "dotenv -e ../../.env -- prisma generate",
-    "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev",
-    "prisma:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
-    "prisma:studio": "dotenv -e ../../.env -- prisma studio"
+    "with-env": "dotenv -e ../../.env --",
+    "test": "pnpm with-env jest --runInBand",
+    "test:watch": "pnpm with-env jest --runInBand --watch",
+    "test:cov": "pnpm with-env jest --runInBand --coverage",
+    "test:e2e": "pnpm with-env jest --runInBand --config ./test/jest-e2e.json",
+    "prisma:generate": "pnpm with-env prisma generate",
+    "prisma:migrate": "pnpm with-env prisma migrate dev",
+    "prisma:deploy": "pnpm with-env prisma migrate deploy",
+    "prisma:studio": "pnpm with-env prisma studio"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

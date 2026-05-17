@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -7,6 +8,7 @@ import {
 import * as argon2 from 'argon2';
 import { VerificationTokenType } from '@prisma/client';
 
+import { AppConfigService } from '@/config/app-config.service';
 import { MailService } from '@/modules/mail/mail.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { UsersService } from '@/modules/users/users.service';
@@ -36,9 +38,9 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly mail: MailService,
     private readonly prisma: PrismaService,
+    private readonly config: AppConfigService,
   ) {}
 
-  // Local Authentication (email + password)
   async validateLocalCredentials(
     email: string,
     password: string,
@@ -49,6 +51,14 @@ export class AuthService {
     const valid = await argon2.verify(user.passwordHash, password);
     if (!valid) return null;
     if (!user.isActive) throw new UnauthorizedException('Account disabled');
+
+    // Checked after password to avoid leaking verified-vs-unverified via timing.
+    if (this.config.requireEmailVerification && !user.emailVerifiedAt) {
+      throw new ForbiddenException({
+        message: 'Email not verified',
+        code: 'EMAIL_NOT_VERIFIED',
+      });
+    }
 
     return { id: user.id, email: user.email, role: user.role };
   }
@@ -66,8 +76,7 @@ export class AuthService {
       emailVerified: false,
     });
 
-    // Fire-and-forget verification email — registration shouldn't fail if
-    // email delivery is down.
+    // Fire-and-forget: registration must not fail on email errors.
     const verificationToken = await this.tokens.issueVerificationToken(
       user.id,
       VerificationTokenType.EMAIL_VERIFICATION,
@@ -128,71 +137,48 @@ export class AuthService {
     await this.tokens.revokeAllForUser(userId);
   }
 
-  // OAuth Authentication
+  // Idempotent + race-safe via the provider/providerAccountId unique key.
   async handleOAuthLogin(
     profile: OAuthProfile,
     metadata?: RequestMetadata,
   ): Promise<AuthResult> {
-    // 1. Existing linked account?
-    const existing = await this.prisma.account.findUnique({
+    const email = profile.email.toLowerCase();
+    const emailVerifiedAt = profile.emailVerified ? new Date() : null;
+
+    // Re-login must not clobber locally-set profile fields.
+    const user = await this.prisma.user.upsert({
+      where: { email },
+      create: {
+        email,
+        name: profile.name,
+        avatarUrl: profile.avatarUrl,
+        emailVerifiedAt,
+      },
+      update: {},
+    });
+
+    if (emailVerifiedAt && user.emailVerifiedAt === null) {
+      await this.prisma.user.updateMany({
+        where: { id: user.id, emailVerifiedAt: null },
+        data: { emailVerifiedAt },
+      });
+    }
+
+    await this.prisma.account.upsert({
       where: {
         provider_providerAccountId: {
           provider: profile.provider,
           providerAccountId: profile.providerAccountId,
         },
       },
+      create: {
+        provider: profile.provider,
+        providerAccountId: profile.providerAccountId,
+        userId: user.id,
+      },
+      update: {},
     });
 
-    let userId: string;
-
-    if (existing) {
-      userId = existing.userId;
-    } else {
-      // 2. User with same email — link the new provider to that account.
-      const sameEmail = await this.prisma.user.findUnique({
-        where: { email: profile.email.toLowerCase() },
-      });
-
-      if (sameEmail) {
-        await this.prisma.account.create({
-          data: {
-            provider: profile.provider,
-            providerAccountId: profile.providerAccountId,
-            userId: sameEmail.id,
-          },
-        });
-        userId = sameEmail.id;
-      } else {
-        // 3. Brand new user. We trust OAuth-verified emails; fall back to false otherwise.
-        const created = await this.prisma.user.create({
-          data: {
-            email: profile.email.toLowerCase(),
-            name: profile.name,
-            avatarUrl: profile.avatarUrl,
-            emailVerifiedAt: profile.emailVerified ? new Date() : null,
-            accounts: {
-              create: {
-                provider: profile.provider,
-                providerAccountId: profile.providerAccountId,
-              },
-            },
-          },
-        });
-        userId = created.id;
-      }
-    }
-
-    // If OAuth tells us the email is verified and we hadn't recorded it, record it.
-    if (profile.emailVerified) {
-      await this.prisma.user
-        .updateMany({
-          where: { id: userId, emailVerifiedAt: null },
-          data: { emailVerifiedAt: new Date() },
-        })
-        .catch(() => undefined);
-    }
-
-    const user = await this.users.findByIdOrFail(userId);
     if (!user.isActive) throw new UnauthorizedException('Account disabled');
 
     const authUser: AuthenticatedUser = {

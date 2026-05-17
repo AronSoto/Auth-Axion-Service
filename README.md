@@ -53,13 +53,16 @@ Every concern (token rotation, OAuth account linking, email delivery, RBAC) live
 - **Refresh-token rotation** — old token revoked atomically, new one issued in a single transaction
 - **Reuse detection** — replaying a revoked token revokes the entire token chain for the user (compromise containment)
 - **Email + password** registration with **email verification**
+- **Configurable email-verification gate** — `REQUIRE_EMAIL_VERIFICATION=true` blocks local login until verified; OAuth bypasses it
 - **Password reset** flow — invalidates every active session on completion
-- **OAuth** with Google + GitHub, with **account linking by email**
+- **OAuth** with Google + GitHub, with **account linking by email** (idempotent upsert; profile fields preserved on re-login)
 - **Role-based access control** via guards + decorators (`@Roles('admin')`)
 - **Rate limiting** via `@nestjs/throttler` (configurable TTL + limit)
 - **Swagger / OpenAPI** auto-generated docs
 - **httpOnly + Secure + SameSite** refresh cookie, scoped to `/api/auth`
 - **No info leak** — `forgot-password` / `resend-verification` always return 200
+- **Coalesced silent refresh** on the web client — concurrent 401s share one `/auth/refresh` call, preventing self-inflicted reuse detection
+- **Session-expired overlay** — when refresh fails on a tab that had a session, a graceful full-screen message takes over instead of an abrupt redirect
 
 ---
 

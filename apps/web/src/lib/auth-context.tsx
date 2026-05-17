@@ -11,7 +11,9 @@ import {
   type ReactNode,
 } from 'react';
 
-import { ApiError, AuthUser, authApi } from './api';
+import { SessionExpiredOverlay } from '@/components/session-expired-overlay';
+
+import { ApiError, AuthUser, authApi, registerAuthBridge } from './api';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -19,49 +21,110 @@ interface AuthContextValue {
   isLoading: boolean;
   // True only after the initial silent-refresh attempt has finished.
   isReady: boolean;
+  // True when a previously-active session was just invalidated (refresh failed).
+  sessionExpired: boolean;
+  dismissSessionExpired: () => void;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
-  // Refreshes silently — used by API consumers and on mount.
   refresh: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+// Per-tab marker; distinguishes "expired" from "never logged in".
+const SESSION_MARK_KEY = 'auth-axion:had-session';
+const markSession = () => {
+  try {
+    sessionStorage.setItem(SESSION_MARK_KEY, '1');
+  } catch {}
+};
+const clearSessionMark = () => {
+  try {
+    sessionStorage.removeItem(SESSION_MARK_KEY);
+  } catch {}
+};
+const hadSession = (): boolean => {
+  try {
+    return sessionStorage.getItem(SESSION_MARK_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
-  // Avoid double-firing the silent refresh on React strict-mode mount.
+  const dismissSessionExpired = useCallback(() => setSessionExpired(false), []);
+
+  // Prevents double-fire under React strict-mode.
   const didInit = useRef(false);
-
-  const applySession = useCallback(async (token: string) => {
-    setAccessToken(token);
-    const me = await authApi.me(token);
-    setUser(me);
-  }, []);
+  // Sync mirror so the bridge can read the token outside render.
+  const accessTokenRef = useRef<string | null>(null);
+  // Coalesces concurrent refreshes to avoid reuse-detection.
+  const refreshInFlight = useRef<Promise<string | null> | null>(null);
 
   const refresh = useCallback(async (): Promise<string | null> => {
-    try {
-      const result = await authApi.refresh();
-      await applySession(result.accessToken);
-      return result.accessToken;
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        setUser(null);
-        setAccessToken(null);
+    if (refreshInFlight.current) return refreshInFlight.current;
+
+    const promise = (async () => {
+      try {
+        const result = await authApi.refresh();
+        setAccessToken(result.accessToken);
+        accessTokenRef.current = result.accessToken;
+        return result.accessToken;
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          // Overlay only if this tab actually had a session before.
+          if (accessTokenRef.current !== null || hadSession()) {
+            setSessionExpired(true);
+          }
+          clearSessionMark();
+          setUser(null);
+          setAccessToken(null);
+          accessTokenRef.current = null;
+        }
+        return null;
+      } finally {
+        refreshInFlight.current = null;
       }
-      return null;
-    }
-  }, [applySession]);
+    })();
+
+    refreshInFlight.current = promise;
+    return promise;
+  }, []);
+
+  useEffect(() => {
+    registerAuthBridge({
+      getAccessToken: () => accessTokenRef.current,
+      refresh,
+    });
+  }, [refresh]);
 
   // Silent refresh on mount: if a refresh-cookie exists, restore the session.
   useEffect(() => {
     if (didInit.current) return;
     didInit.current = true;
-    void refresh().finally(() => setIsReady(true));
+    void (async () => {
+      const token = await refresh();
+      if (token) {
+        try {
+          const me = await authApi.me();
+          setUser(me);
+          markSession();
+        } catch {
+          // /me failed after a successful refresh — drop silently.
+          setUser(null);
+          setAccessToken(null);
+          accessTokenRef.current = null;
+        }
+      }
+      setIsReady(true);
+    })();
   }, [refresh]);
 
   const login = useCallback(async (email: string, password: string) => {
@@ -70,6 +133,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await authApi.login({ email, password });
       setUser(result.user);
       setAccessToken(result.accessToken);
+      accessTokenRef.current = result.accessToken;
+      markSession();
+      setSessionExpired(false);
     } finally {
       setIsLoading(false);
     }
@@ -81,6 +147,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await authApi.register({ email, password, name });
       setUser(result.user);
       setAccessToken(result.accessToken);
+      accessTokenRef.current = result.accessToken;
+      markSession();
+      setSessionExpired(false);
     } finally {
       setIsLoading(false);
     }
@@ -92,15 +161,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setUser(null);
       setAccessToken(null);
+      accessTokenRef.current = null;
+      clearSessionMark();
+      setSessionExpired(false);
     }
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, accessToken, isLoading, isReady, login, register, logout, refresh }),
-    [user, accessToken, isLoading, isReady, login, register, logout, refresh],
+    () => ({
+      user,
+      accessToken,
+      isLoading,
+      isReady,
+      sessionExpired,
+      dismissSessionExpired,
+      login,
+      register,
+      logout,
+      refresh,
+    }),
+    [
+      user,
+      accessToken,
+      isLoading,
+      isReady,
+      sessionExpired,
+      dismissSessionExpired,
+      login,
+      register,
+      logout,
+      refresh,
+    ],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      <SessionExpiredOverlay open={sessionExpired} onDismiss={dismissSessionExpired} />
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {
