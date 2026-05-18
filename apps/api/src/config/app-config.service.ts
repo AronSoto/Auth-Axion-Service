@@ -33,10 +33,6 @@ export class AppConfigService {
   get frontendUrl(): string {
     return this.get('FRONTEND_URL');
   }
-  get cookieSecret(): string {
-    return this.get('COOKIE_SECRET') ?? this.get('JWT_ACCESS_SECRET');
-  }
-
   get throttle(): { ttl: number; limit: number } {
     return { ttl: this.get('THROTTLE_TTL'), limit: this.get('THROTTLE_LIMIT') };
   }

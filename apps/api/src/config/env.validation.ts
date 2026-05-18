@@ -19,7 +19,6 @@ export const envSchema = z
       .string()
       .min(32, 'JWT_REFRESH_SECRET must be at least 32 chars'),
     JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
-    COOKIE_SECRET: z.string().min(16).optional(),
 
     THROTTLE_TTL: z.coerce.number().int().positive().default(60),
     THROTTLE_LIMIT: z.coerce.number().int().positive().default(10),

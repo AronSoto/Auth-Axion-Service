@@ -21,7 +21,7 @@ async function bootstrap(): Promise<void> {
 
   app.use(helmet());
   app.use(compression());
-  app.use(cookieParser(config.cookieSecret));
+  app.use(cookieParser());
 
   app.enableCors({
     origin: config.frontendUrl,

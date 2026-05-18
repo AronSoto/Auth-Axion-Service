@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { AuthProvider } from '@prisma/client';
 import * as argon2 from 'argon2';
 
@@ -299,7 +299,7 @@ describe('AuthService.validateLocalCredentials — email verification gate', () 
     expect(result?.email).toBe('alice@test.dev');
   });
 
-  it('with the flag ON, a wrong password still returns null (no enumeration of verified-vs-unverified)', async () => {
+  it('with the flag ON, a wrong password throws Unauthorized (no enumeration of verified-vs-unverified)', async () => {
     requireVerificationSpy.mockReturnValue(true);
     const passwordHash = await argon2.hash('Password123!');
     await prisma.user.create({
@@ -307,11 +307,10 @@ describe('AuthService.validateLocalCredentials — email verification gate', () 
     });
 
     // Wrong password on an unverified user must NOT reveal the
-    // EMAIL_NOT_VERIFIED state. It returns null just like any bad login.
-    const result = await auth.validateLocalCredentials(
-      'alice@test.dev',
-      'wrong-password',
-    );
-    expect(result).toBeNull();
+    // EMAIL_NOT_VERIFIED state. It throws the generic Unauthorized,
+    // identical to any other bad login.
+    await expect(
+      auth.validateLocalCredentials('alice@test.dev', 'wrong-password'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });
