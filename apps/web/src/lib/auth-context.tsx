@@ -13,10 +13,10 @@ import {
 
 import { SessionExpiredOverlay } from '@/components/session-expired-overlay';
 
-import { ApiError, AuthUser, authApi, registerAuthBridge } from './api';
+import { ApiError, UserProfile, authApi, registerAuthBridge } from './api';
 
 interface AuthContextValue {
-  user: AuthUser | null;
+  user: UserProfile | null;
   accessToken: string | null;
   isLoading: boolean;
   // True only after the initial silent-refresh attempt has finished.
@@ -27,7 +27,9 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
-  refresh: () => Promise<string | null>;
+  // Refresh the access token AND load the full profile. Used by the OAuth
+  // callback page, which only has a refresh cookie when it lands.
+  hydrate: () => Promise<UserProfile | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -55,7 +57,7 @@ const hadSession = (): boolean => {
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -110,6 +112,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return promise;
   }, []);
 
+  const hydrate = useCallback(async (): Promise<UserProfile | null> => {
+    const token = await refresh();
+    if (!token) return null;
+    try {
+      const profile = await authApi.me();
+      setUser(profile);
+      markSession();
+      return profile;
+    } catch {
+      // /me failed after a successful refresh — drop silently.
+      clearLocalSession();
+      return null;
+    }
+  }, [refresh, clearLocalSession]);
+
   useEffect(() => {
     registerAuthBridge({
       getAccessToken: () => accessTokenRef.current,
@@ -140,50 +157,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (didInit.current) return;
     didInit.current = true;
     void (async () => {
-      const token = await refresh();
-      if (token) {
-        try {
-          const me = await authApi.me();
-          setUser(me);
-          markSession();
-        } catch {
-          // /me failed after a successful refresh — drop silently.
-          setUser(null);
-          setAccessToken(null);
-          accessTokenRef.current = null;
-        }
-      }
+      await hydrate();
       setIsReady(true);
     })();
-  }, [refresh]);
+  }, [hydrate]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      const result = await authApi.login({ email, password });
-      setUser(result.user);
-      setAccessToken(result.accessToken);
-      accessTokenRef.current = result.accessToken;
+  // After login/register the API returns a session-shaped user. We still call
+  // /users/me to load the full profile (name, avatarUrl, timestamps).
+  const completeSession = useCallback(
+    async (accessToken: string): Promise<void> => {
+      setAccessToken(accessToken);
+      accessTokenRef.current = accessToken;
       markSession();
       setSessionExpired(false);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      try {
+        const profile = await authApi.me();
+        setUser(profile);
+      } catch {
+        // If /me fails right after a successful auth response, drop silently —
+        // the next page will retry via hydrate().
+        clearLocalSession();
+      }
+    },
+    [clearLocalSession],
+  );
 
-  const register = useCallback(async (email: string, password: string, name?: string) => {
-    setIsLoading(true);
-    try {
-      const result = await authApi.register({ email, password, name });
-      setUser(result.user);
-      setAccessToken(result.accessToken);
-      accessTokenRef.current = result.accessToken;
-      markSession();
-      setSessionExpired(false);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      setIsLoading(true);
+      try {
+        const result = await authApi.login({ email, password });
+        await completeSession(result.accessToken);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [completeSession],
+  );
+
+  const register = useCallback(
+    async (email: string, password: string, name?: string) => {
+      setIsLoading(true);
+      try {
+        const result = await authApi.register({ email, password, name });
+        await completeSession(result.accessToken);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [completeSession],
+  );
 
   const logout = useCallback(async () => {
     try {
@@ -206,7 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
-      refresh,
+      hydrate,
     }),
     [
       user,
@@ -218,7 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
-      refresh,
+      hydrate,
     ],
   );
 

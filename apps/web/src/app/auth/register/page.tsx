@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 
+import { Logo } from '@/components/logo';
 import { Button, Card, Input } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -37,8 +38,7 @@ export default function RegisterPage() {
 
       <Card className="entry-card relative z-10 w-full max-w-md">
         <div className="mb-7 flex items-center gap-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/favicon.ico" alt="Axion" className="h-8 w-8" />
+          <Logo />
           <h1 className="text-base font-semibold">Create your account</h1>
         </div>
 

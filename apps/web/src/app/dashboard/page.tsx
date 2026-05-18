@@ -5,7 +5,9 @@ import gsap from 'gsap';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
+import { Logo } from '@/components/logo';
 import { Button, Card } from '@/components/ui';
+import { swaggerUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
 export default function DashboardPage() {
@@ -64,8 +66,7 @@ export default function DashboardPage() {
       <div className="relative mx-auto max-w-3xl">
         <div className="dash-header mb-10 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/favicon.ico" alt="Axion" className="h-8 w-8" />
+            <Logo />
             <span className="text-sm font-semibold">Auth Axion</span>
           </div>
           <Button variant="ghost" onClick={handleLogout}>
@@ -75,7 +76,7 @@ export default function DashboardPage() {
 
         <Card className="dash-card">
           <h1 className="text-2xl font-semibold tracking-tight">
-            Welcome, {user.email.split('@')[0]} 👋
+            Welcome, {user.name ?? user.email.split('@')[0]} 👋
           </h1>
           <p className="mt-2 text-sm text-muted">
             You&apos;re signed in. The dashboard is intentionally minimal — the goal of this project
@@ -104,7 +105,7 @@ export default function DashboardPage() {
 
         <div className="mt-6 grid gap-4 text-xs text-muted sm:grid-cols-2">
           <a
-            href="http://localhost:3000/api/docs"
+            href={swaggerUrl}
             target="_blank"
             rel="noreferrer"
             className="dash-resource rounded-xl border border-border bg-card p-4 transition-colors hover:bg-border/20"

@@ -4,6 +4,18 @@ import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import type { DependencyList } from 'react';
 
+// Motion language stays consistent.
+function ambientGlow(direction: { x: number; y: number; duration?: number }) {
+  gsap.to('.glow', {
+    x: direction.x,
+    y: direction.y,
+    repeat: -1,
+    yoyo: true,
+    duration: direction.duration ?? 6,
+    ease: 'sine.inOut',
+  });
+}
+
 export function usePageEntry(deps: DependencyList = []): void {
   useGSAP(
     () => {
@@ -21,14 +33,20 @@ export function usePageEntry(deps: DependencyList = []): void {
         '-=0.3',
       );
 
-      gsap.to('.glow', {
-        x: 18,
-        y: -8,
-        repeat: -1,
-        yoyo: true,
-        duration: 6,
-        ease: 'sine.inOut',
-      });
+      ambientGlow({ x: 18, y: -8 });
+    },
+    { dependencies: [...deps] },
+  );
+}
+
+// Standalone drift for pages that own their entry timeline (landing, dashboard).
+export function useAmbientGlow(
+  direction: { x: number; y: number; duration?: number },
+  deps: DependencyList = [],
+): void {
+  useGSAP(
+    () => {
+      ambientGlow(direction);
     },
     { dependencies: [...deps] },
   );

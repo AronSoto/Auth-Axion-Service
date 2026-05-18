@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 function OAuthCallbackContent() {
   const router = useRouter();
   const params = useSearchParams();
-  const { refresh } = useAuth();
+  const { hydrate } = useAuth();
   const root = useRef<HTMLElement>(null);
 
   useGSAP(
@@ -40,10 +40,10 @@ function OAuthCallbackContent() {
       return;
     }
     void (async () => {
-      const token = await refresh();
-      router.replace(token ? '/dashboard' : '/?error=oauth_failed');
+      const profile = await hydrate();
+      router.replace(profile ? '/dashboard' : '/?error=oauth_failed');
     })();
-  }, [refresh, router, errorParam]);
+  }, [hydrate, router, errorParam]);
 
   return (
     <main ref={root} className="flex flex-1 items-center justify-center">

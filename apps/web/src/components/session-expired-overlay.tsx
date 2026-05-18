@@ -3,20 +3,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-interface Props {
-  open: boolean;
+interface OverlayProps {
   onDismiss: () => void;
   autoRedirectMs?: number;
   redirectTo?: string;
 }
 
-export function SessionExpiredOverlay(props: Props) {
-  // Remount fresh on each open so state initialisers stay declarative.
-  if (!props.open) return null;
-  return <OverlayBody {...props} />;
+interface Props extends OverlayProps {
+  open: boolean;
 }
 
-function OverlayBody({ onDismiss, autoRedirectMs = 6000, redirectTo = '/' }: Props) {
+export function SessionExpiredOverlay({ open, ...rest }: Props) {
+  // Remount fresh on each open so state initialisers stay declarative.
+  if (!open) return null;
+  return <OverlayBody {...rest} />;
+}
+
+function OverlayBody({ onDismiss, autoRedirectMs = 6000, redirectTo = '/' }: OverlayProps) {
   const router = useRouter();
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [endTime] = useState(() => Date.now() + autoRedirectMs);

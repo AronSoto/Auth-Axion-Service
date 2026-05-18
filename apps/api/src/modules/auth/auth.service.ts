@@ -15,7 +15,7 @@ import { MailService } from '@/modules/mail/mail.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { UsersService } from '@/modules/users/users.service';
 
-import { AuthTokens, AuthenticatedUser, OAuthProfile } from './auth.types';
+import { AuthTokens, AuthUser, OAuthProfile } from './auth.types';
 import { TokenService } from './token.service';
 
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
@@ -27,7 +27,7 @@ interface RequestMetadata {
 }
 
 interface AuthResult {
-  user: AuthenticatedUser;
+  user: AuthUser;
   tokens: AuthTokens;
 }
 
@@ -53,7 +53,7 @@ export class AuthService implements OnModuleInit {
   async validateLocalCredentials(
     email: string,
     password: string,
-  ): Promise<AuthenticatedUser> {
+  ): Promise<AuthUser> {
     const user = await this.users.findByEmail(email);
 
     // Always verify, even without a user.
@@ -104,7 +104,7 @@ export class AuthService implements OnModuleInit {
         );
       });
 
-    const authUser: AuthenticatedUser = {
+    const authUser: AuthUser = {
       id: user.id,
       email: user.email,
       role: user.role,
@@ -114,10 +114,7 @@ export class AuthService implements OnModuleInit {
     return { user: authUser, tokens };
   }
 
-  async login(
-    user: AuthenticatedUser,
-    metadata?: RequestMetadata,
-  ): Promise<AuthTokens> {
+  async login(user: AuthUser, metadata?: RequestMetadata): Promise<AuthTokens> {
     return this.tokens.issueTokensForUser(user, metadata);
   }
 
@@ -233,7 +230,7 @@ export class AuthService implements OnModuleInit {
       return resolved;
     });
 
-    const authUser: AuthenticatedUser = {
+    const authUser: AuthUser = {
       id: user.id,
       email: user.email,
       role: user.role,

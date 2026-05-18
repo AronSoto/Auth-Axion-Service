@@ -8,7 +8,7 @@ import { VerificationTokenType } from '@prisma/client';
 import { AppConfigService } from '@/config/app-config.service';
 import { PrismaService } from '@/prisma/prisma.service';
 
-import { AuthTokens, AuthenticatedUser, JwtAccessPayload } from './auth.types';
+import { AuthTokens, AuthUser, JwtAccessPayload } from './auth.types';
 
 const REFRESH_TOKEN_BYTES = 48;
 const VERIFICATION_TOKEN_BYTES = 32;
@@ -40,7 +40,7 @@ export class TokenService {
   }
 
   // Access token (JWT)
-  signAccessToken(user: AuthenticatedUser): string {
+  signAccessToken(user: AuthUser): string {
     const payload: JwtAccessPayload = {
       sub: user.id,
       email: user.email,
@@ -154,7 +154,7 @@ export class TokenService {
   }
 
   async issueTokensForUser(
-    user: AuthenticatedUser,
+    user: AuthUser,
     metadata?: { userAgent?: string; ipAddress?: string },
   ): Promise<AuthTokens> {
     const accessToken = this.signAccessToken(user);

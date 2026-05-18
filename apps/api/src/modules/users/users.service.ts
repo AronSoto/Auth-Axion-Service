@@ -92,11 +92,4 @@ export class UsersService {
       data: { emailVerifiedAt: new Date() },
     });
   }
-
-  async updatePasswordHash(id: string, passwordHash: string): Promise<void> {
-    await this.prisma.user.update({
-      where: { id },
-      data: { passwordHash },
-    });
-  }
 }
