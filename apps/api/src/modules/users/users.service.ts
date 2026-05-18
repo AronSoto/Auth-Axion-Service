@@ -44,11 +44,6 @@ export class UsersService {
     });
   }
 
-  /** Used internally during local-strategy login — returns the full user, including passwordHash. */
-  async findByEmailWithPassword(email: string): Promise<User | null> {
-    return this.findByEmail(email);
-  }
-
   async create(input: {
     email: string;
     name?: string;
@@ -57,19 +52,27 @@ export class UsersService {
     emailVerified?: boolean;
     role?: UserRole;
   }): Promise<User> {
-    const existing = await this.findByEmail(input.email);
-    if (existing) throw new ConflictException('Email already registered');
-
-    return this.prisma.user.create({
-      data: {
-        email: input.email.toLowerCase(),
-        name: input.name,
-        passwordHash: input.passwordHash ?? null,
-        avatarUrl: input.avatarUrl,
-        emailVerifiedAt: input.emailVerified ? new Date() : null,
-        role: input.role ?? 'USER',
-      },
-    });
+    try {
+      return await this.prisma.user.create({
+        data: {
+          email: input.email.toLowerCase(),
+          name: input.name,
+          passwordHash: input.passwordHash ?? null,
+          avatarUrl: input.avatarUrl,
+          emailVerifiedAt: input.emailVerified ? new Date() : null,
+          role: input.role ?? 'USER',
+        },
+      });
+    } catch (err) {
+      // P2002 = unique constraint violation; race-safe than a pre-check.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new ConflictException('Email already registered');
+      }
+      throw err;
+    }
   }
 
   async updateProfile(

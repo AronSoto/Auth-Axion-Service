@@ -33,17 +33,18 @@ Every concern (token rotation, OAuth account linking, email delivery, RBAC) live
 
 ## 🧱 Stack
 
-| Layer           | Tech                                                                             |
-| :-------------- | :------------------------------------------------------------------------------- |
-| **Backend**     | NestJS 11, Passport.js, JWT (access + refresh rotation), Prisma 6, PostgreSQL 16 |
-| **Frontend**    | Next.js 16 (App Router), React 19, Tailwind CSS v4                               |
-| **OAuth**       | Google, GitHub                                                                   |
-| **Email**       | Resend (prod) + Nodemailer / Mailtrap (dev)                                      |
-| **Validation**  | Zod (env), class-validator (DTOs)                                                |
-| **Hardening**   | Helmet, CORS, @nestjs/throttler, role-based guards, secure cookies               |
-| **Docs**        | Swagger / OpenAPI at `/api/docs`                                                 |
-| **Tooling**     | pnpm workspaces, ESLint, Prettier, Husky, lint-staged, commitlint                |
-| **Infra (dev)** | Docker Compose (Postgres 16-alpine)                                              |
+| Layer           | Tech                                                                                |
+| :-------------- | :---------------------------------------------------------------------------------- |
+| **Backend**     | NestJS 11, Passport.js, JWT (access + refresh rotation), Prisma 6, PostgreSQL 16    |
+| **Frontend**    | Next.js 16 (App Router), React 19, Tailwind CSS v4                                  |
+| **OAuth**       | Google, GitHub                                                                      |
+| **Email**       | Resend (prod) + Nodemailer / Mailtrap (dev)                                         |
+| **Validation**  | Zod (env), class-validator (DTOs)                                                   |
+| **Hardening**   | Helmet, CORS, @nestjs/throttler, role-based guards, secure cookies                  |
+| **Docs**        | Swagger / OpenAPI at `/api/docs`                                                    |
+| **Tests**       | Jest integration tests against Postgres — token rotation, OAuth linking, email gate |
+| **Tooling**     | pnpm workspaces, ESLint, Prettier, Husky, lint-staged, commitlint                   |
+| **Infra (dev)** | Docker Compose (Postgres 16-alpine)                                                 |
 
 ---
 
@@ -53,13 +54,17 @@ Every concern (token rotation, OAuth account linking, email delivery, RBAC) live
 - **Refresh-token rotation** — old token revoked atomically, new one issued in a single transaction
 - **Reuse detection** — replaying a revoked token revokes the entire token chain for the user (compromise containment)
 - **Email + password** registration with **email verification**
+- **Configurable email-verification gate** — `REQUIRE_EMAIL_VERIFICATION=true` blocks local login until verified; OAuth bypasses it
 - **Password reset** flow — invalidates every active session on completion
-- **OAuth** with Google + GitHub, with **account linking by email**
+- **OAuth** with Google + GitHub, with **account linking by email** (idempotent upsert; profile fields preserved on re-login)
 - **Role-based access control** via guards + decorators (`@Roles('admin')`)
 - **Rate limiting** via `@nestjs/throttler` (configurable TTL + limit)
 - **Swagger / OpenAPI** auto-generated docs
 - **httpOnly + Secure + SameSite** refresh cookie, scoped to `/api/auth`
 - **No info leak** — `forgot-password` / `resend-verification` always return 200
+- **Coalesced silent refresh** on the web client — concurrent 401s share one `/auth/refresh` call, preventing self-inflicted reuse detection
+- **Session-expired overlay** — when refresh fails on a tab that had a session, a graceful full-screen message takes over instead of an abrupt redirect
+- **Cross-tab logout sync** via `BroadcastChannel` — logging out in one tab surfaces the expired overlay in every other open tab
 
 ---
 
@@ -262,9 +267,17 @@ Per-app deep dives:
 
 ---
 
-## 🧪 Testing each flow
+## 🧪 Testing
 
-After `pnpm dev`, with everything green:
+**Automated** — run the Jest integration suite against the dev Postgres:
+
+```bash
+pnpm --filter @auth-axion/api test
+```
+
+Covers refresh-token rotation, reuse detection, OAuth account linking, and the email-verification gate. Tests truncate and re-seed between cases, so they need Docker up (`pnpm db:up`).
+
+**Manual smoke test** — after `pnpm dev`, with everything green:
 
 | Flow                   | How to trigger                                                                               |
 | :--------------------- | :------------------------------------------------------------------------------------------- |

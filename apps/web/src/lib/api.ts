@@ -22,20 +22,27 @@ export class ApiError extends Error {
   }
 }
 
-interface RequestOptions extends Omit<RequestInit, 'body'> {
-  body?: unknown;
-  accessToken?: string;
+// Bridge from the React context into this plain module (see auth-context.tsx).
+interface AuthBridge {
+  getAccessToken: () => string | null;
+  refresh: () => Promise<string | null>;
 }
 
-/**
- * Low-level fetch wrapper.
- *
- * - Sends `credentials: include` so the refresh-token cookie is round-tripped.
- * - Unwraps the `{ data, timestamp }` envelope set by the API's TransformInterceptor.
- * - Throws ApiError on non-2xx responses with the parsed message.
- */
+let authBridge: AuthBridge | null = null;
+
+export function registerAuthBridge(bridge: AuthBridge): void {
+  authBridge = bridge;
+}
+
+interface RequestOptions extends Omit<RequestInit, 'body'> {
+  body?: unknown;
+  auth?: boolean;
+  _retried?: boolean;
+}
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, accessToken, headers, ...rest } = options;
+  const { body, auth, _retried, headers, ...rest } = options;
+
+  const accessToken = auth ? authBridge?.getAccessToken() : undefined;
 
   const finalHeaders: HeadersInit = {
     'Content-Type': 'application/json',
@@ -49,6 +56,13 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     headers: finalHeaders,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+
+  if (res.status === 401 && auth && !_retried && authBridge) {
+    const newToken = await authBridge.refresh();
+    if (newToken) {
+      return apiFetch<T>(path, { ...options, _retried: true });
+    }
+  }
 
   if (res.status === 204) return undefined as T;
 
@@ -91,7 +105,7 @@ export const authApi = {
 
   logout: () => apiFetch<void>('/auth/logout', { method: 'POST' }),
 
-  me: (accessToken: string) => apiFetch<AuthUser>('/auth/me', { accessToken }),
+  me: () => apiFetch<AuthUser>('/auth/me', { auth: true }),
 
   forgotPassword: (email: string) =>
     apiFetch<{ ok: true }>('/auth/forgot-password', { method: 'POST', body: { email } }),

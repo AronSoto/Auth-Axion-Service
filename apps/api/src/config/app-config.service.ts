@@ -41,6 +41,10 @@ export class AppConfigService {
     return { ttl: this.get('THROTTLE_TTL'), limit: this.get('THROTTLE_LIMIT') };
   }
 
+  get requireEmailVerification(): boolean {
+    return this.get('REQUIRE_EMAIL_VERIFICATION');
+  }
+
   get jwt(): {
     accessSecret: string;
     accessExpiresIn: string;

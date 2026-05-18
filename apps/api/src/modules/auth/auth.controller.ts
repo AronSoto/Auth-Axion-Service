@@ -18,12 +18,14 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import type { AuthUser } from '@/common/decorators/current-user.decorator';
 import { Public } from '@/common/decorators/public.decorator';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { THROTTLE } from '@/common/throttle';
 import { AppConfigService } from '@/config/app-config.service';
 
 import { AuthService } from './auth.service';
@@ -53,32 +55,43 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly config: AppConfigService,
   ) {}
+  private get refreshCookieAttrs() {
+    return {
+      httpOnly: true,
+      secure: this.config.isProduction,
+      sameSite: this.config.isProduction ? ('none' as const) : ('lax' as const),
+      path: REFRESH_COOKIE_PATH,
+    };
+  }
 
-  // Cookie + metadata helpers
   private setRefreshCookie(
     res: Response,
     token: string,
     expiresAt: Date,
   ): void {
     res.cookie(REFRESH_COOKIE, token, {
-      httpOnly: true,
-      secure: this.config.isProduction,
-      sameSite: this.config.isProduction ? 'none' : 'lax',
-      path: REFRESH_COOKIE_PATH,
+      ...this.refreshCookieAttrs,
       expires: expiresAt,
     });
   }
 
   private clearRefreshCookie(res: Response): void {
-    res.clearCookie(REFRESH_COOKIE, { path: REFRESH_COOKIE_PATH });
+    res.clearCookie(REFRESH_COOKIE, this.refreshCookieAttrs);
   }
 
   private metadata(req: Request): { userAgent?: string; ipAddress?: string } {
     return { userAgent: req.headers['user-agent'], ipAddress: req.ip };
   }
 
+  private getRefreshTokenFromCookies(req: Request): string | undefined {
+    return (req.cookies as Record<string, string> | undefined)?.[
+      REFRESH_COOKIE
+    ];
+  }
+
   // Local auth
   @Public()
+  @Throttle(THROTTLE.AUTH)
   @Post('register')
   @ApiOperation({ summary: 'Register a new local account' })
   async register(
@@ -96,6 +109,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle(THROTTLE.AUTH)
   @UseGuards(LocalAuthGuard)
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -126,9 +140,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ accessToken: string }> {
-    const presented = (req.cookies as Record<string, string> | undefined)?.[
-      REFRESH_COOKIE
-    ];
+    const presented = this.getRefreshTokenFromCookies(req);
     if (!presented) throw new UnauthorizedException('Missing refresh token');
 
     const tokens = await this.auth.refresh(presented, this.metadata(req));
@@ -150,9 +162,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
-    const presented = (req.cookies as Record<string, string> | undefined)?.[
-      REFRESH_COOKIE
-    ];
+    const presented = this.getRefreshTokenFromCookies(req);
     if (presented) await this.auth.logout(presented);
     this.clearRefreshCookie(res);
   }
@@ -182,6 +192,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle(THROTTLE.EMAIL_SEND)
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -196,6 +207,7 @@ export class AuthController {
 
   // Password reset
   @Public()
+  @Throttle(THROTTLE.EMAIL_SEND)
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -207,6 +219,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle(THROTTLE.AUTH)
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -222,29 +235,14 @@ export class AuthController {
   @Get('google')
   @UseGuards(GoogleAuthGuard)
   @ApiOperation({ summary: 'Start the Google OAuth flow' })
-  googleAuth(): void {
-    // Passport handles the redirect to Google.
-  }
+  googleAuth(): void {}
 
   @Public()
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
   @ApiOperation({ summary: 'Google OAuth callback' })
-  async googleCallback(
-    @Req() req: Request,
-    @Res() res: Response,
-  ): Promise<void> {
-    const profile = req.user as OAuthProfile;
-    const result = await this.auth.handleOAuthLogin(
-      profile,
-      this.metadata(req),
-    );
-    this.setRefreshCookie(
-      res,
-      result.tokens.refreshToken,
-      result.tokens.refreshTokenExpiresAt,
-    );
-    res.redirect(`${this.config.frontendUrl}/auth/oauth-callback`);
+  googleCallback(@Req() req: Request, @Res() res: Response): Promise<void> {
+    return this.handleOAuthCallback(req, res);
   }
 
   // OAuth — GitHub
@@ -252,17 +250,20 @@ export class AuthController {
   @Get('github')
   @UseGuards(GithubAuthGuard)
   @ApiOperation({ summary: 'Start the GitHub OAuth flow' })
-  githubAuth(): void {
-    // Passport handles the redirect to GitHub.
-  }
+  githubAuth(): void {}
 
   @Public()
   @Get('github/callback')
   @UseGuards(GithubAuthGuard)
   @ApiOperation({ summary: 'GitHub OAuth callback' })
-  async githubCallback(
-    @Req() req: Request,
-    @Res() res: Response,
+  githubCallback(@Req() req: Request, @Res() res: Response): Promise<void> {
+    return this.handleOAuthCallback(req, res);
+  }
+
+  // Shared by both OAuth providers
+  private async handleOAuthCallback(
+    req: Request,
+    res: Response,
   ): Promise<void> {
     const profile = req.user as OAuthProfile;
     const result = await this.auth.handleOAuthLogin(
