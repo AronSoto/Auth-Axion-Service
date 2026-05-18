@@ -1,7 +1,6 @@
 import { randomBytes } from 'crypto';
 
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -241,20 +240,6 @@ export class AuthService implements OnModuleInit {
     };
     const tokens = await this.tokens.issueTokensForUser(authUser, metadata);
     return { user: authUser, tokens };
-  }
-
-  // Email verification
-  async requestEmailVerification(userId: string): Promise<void> {
-    const user = await this.users.findByIdOrFail(userId);
-    if (user.emailVerifiedAt)
-      throw new BadRequestException('Email already verified');
-
-    const token = await this.tokens.issueVerificationToken(
-      userId,
-      VerificationTokenType.EMAIL_VERIFICATION,
-      VERIFICATION_TOKEN_TTL_MS,
-    );
-    await this.mail.sendVerificationEmail(user.email, token);
   }
 
   // Idempotent + silent: never reveals whether an email is registered or already verified.
