@@ -18,12 +18,14 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import type { AuthUser } from '@/common/decorators/current-user.decorator';
 import { Public } from '@/common/decorators/public.decorator';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { THROTTLE } from '@/common/throttle';
 import { AppConfigService } from '@/config/app-config.service';
 
 import { AuthService } from './auth.service';
@@ -79,6 +81,7 @@ export class AuthController {
 
   // Local auth
   @Public()
+  @Throttle(THROTTLE.AUTH)
   @Post('register')
   @ApiOperation({ summary: 'Register a new local account' })
   async register(
@@ -96,6 +99,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle(THROTTLE.AUTH)
   @UseGuards(LocalAuthGuard)
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -182,6 +186,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle(THROTTLE.EMAIL_SEND)
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -196,6 +201,7 @@ export class AuthController {
 
   // Password reset
   @Public()
+  @Throttle(THROTTLE.EMAIL_SEND)
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -207,6 +213,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle(THROTTLE.AUTH)
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

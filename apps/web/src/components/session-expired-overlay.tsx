@@ -63,13 +63,13 @@ function OverlayBody({ onDismiss, autoRedirectMs = 6000, redirectTo = '/' }: Pro
       <div className="absolute inset-0 bg-background/70 backdrop-blur-xl" onClick={close} />
 
       <div
-        className="relative w-full max-w-md rounded-[2rem] border border-border bg-card p-10
+        className="relative w-full max-w-md rounded-4xl border border-border bg-card p-10
                    shadow-[0_20px_60px_-20px_rgba(0,0,0,0.18)]
                    animate-panel-in"
       >
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-[2rem]
+          className="pointer-events-none absolute inset-0 rounded-4xl
                      shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
         />
 

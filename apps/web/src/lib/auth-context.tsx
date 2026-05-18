@@ -34,6 +34,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 // Per-tab marker; distinguishes "expired" from "never logged in".
 const SESSION_MARK_KEY = 'auth-axion:had-session';
+const BROADCAST_CHANNEL = 'auth-axion:auth';
+type AuthBroadcast = { type: 'logout' };
 const markSession = () => {
   try {
     sessionStorage.setItem(SESSION_MARK_KEY, '1');
@@ -67,6 +69,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const accessTokenRef = useRef<string | null>(null);
   // Coalesces concurrent refreshes to avoid reuse-detection.
   const refreshInFlight = useRef<Promise<string | null> | null>(null);
+  // Cross-tab logout channel.
+  const broadcastRef = useRef<BroadcastChannel | null>(null);
+
+  const clearLocalSession = useCallback(() => {
+    setUser(null);
+    setAccessToken(null);
+    accessTokenRef.current = null;
+    clearSessionMark();
+  }, []);
 
   const refresh = useCallback(async (): Promise<string | null> => {
     if (refreshInFlight.current) return refreshInFlight.current;
@@ -76,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const result = await authApi.refresh();
         setAccessToken(result.accessToken);
         accessTokenRef.current = result.accessToken;
+        markSession();
         return result.accessToken;
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
@@ -104,6 +116,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refresh,
     });
   }, [refresh]);
+
+  // Listen for cross-tab logouts. Other tabs will surface the session-expired overlay.
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const bc = new BroadcastChannel(BROADCAST_CHANNEL);
+    broadcastRef.current = bc;
+    bc.onmessage = (e: MessageEvent<AuthBroadcast>) => {
+      if (e.data?.type !== 'logout') return;
+      if (accessTokenRef.current !== null || hadSession()) {
+        setSessionExpired(true);
+      }
+      clearLocalSession();
+    };
+    return () => {
+      bc.close();
+      broadcastRef.current = null;
+    };
+  }, [clearLocalSession]);
 
   // Silent refresh on mount: if a refresh-cookie exists, restore the session.
   useEffect(() => {
@@ -159,13 +189,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.logout();
     } finally {
-      setUser(null);
-      setAccessToken(null);
-      accessTokenRef.current = null;
-      clearSessionMark();
+      clearLocalSession();
       setSessionExpired(false);
+      broadcastRef.current?.postMessage({ type: 'logout' } satisfies AuthBroadcast);
     }
-  }, []);
+  }, [clearLocalSession]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
