@@ -4,12 +4,15 @@ Minimal **Next.js 16** + **Tailwind v4** demo frontend that consumes [`@auth-axi
 
 ## Pages
 
-| Route                  | Purpose                                                                   |
-| :--------------------- | :------------------------------------------------------------------------ |
-| `/`                    | Landing — pitch on the left, embedded login form on the right.            |
-| `/auth/register`       | Email + password sign up.                                                 |
-| `/auth/oauth-callback` | Lands here after Google / GitHub OAuth, refreshes the session, redirects. |
-| `/dashboard`           | Auth-gated profile screen (just enough to prove the session works).       |
+| Route                   | Purpose                                                                   |
+| :---------------------- | :------------------------------------------------------------------------ |
+| `/`                     | Landing — pitch on the left, embedded login form on the right.            |
+| `/auth/register`        | Email + password sign up.                                                 |
+| `/auth/verify-email`    | Consumes the `?token=…` from the verification mail.                       |
+| `/auth/forgot-password` | Silent reset-link request (no info leak).                                 |
+| `/auth/reset-password`  | Consumes the `?token=…` from the reset mail, sets a new password.         |
+| `/auth/oauth-callback`  | Lands here after Google / GitHub OAuth, refreshes the session, redirects. |
+| `/dashboard`            | Auth-gated profile screen (just enough to prove the session works).       |
 
 ## Architecture
 
