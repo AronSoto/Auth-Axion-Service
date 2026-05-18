@@ -167,7 +167,6 @@ export class TokenService {
     });
   }
 
-  // Convenience method to issue a new access + refresh token pair for a user.
   async issueTokensForUser(
     user: AuthenticatedUser,
     metadata?: { userAgent?: string; ipAddress?: string },
@@ -181,7 +180,6 @@ export class TokenService {
     };
   }
 
-  // Verify email + password, then issue tokens.
   async issueVerificationToken(
     userId: string,
     type: VerificationTokenType,

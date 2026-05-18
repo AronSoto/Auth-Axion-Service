@@ -83,6 +83,12 @@ export class AuthController {
     return { userAgent: req.headers['user-agent'], ipAddress: req.ip };
   }
 
+  private getRefreshTokenFromCookies(req: Request): string | undefined {
+    return (req.cookies as Record<string, string> | undefined)?.[
+      REFRESH_COOKIE
+    ];
+  }
+
   // Local auth
   @Public()
   @Throttle(THROTTLE.AUTH)
@@ -134,9 +140,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ accessToken: string }> {
-    const presented = (req.cookies as Record<string, string> | undefined)?.[
-      REFRESH_COOKIE
-    ];
+    const presented = this.getRefreshTokenFromCookies(req);
     if (!presented) throw new UnauthorizedException('Missing refresh token');
 
     const tokens = await this.auth.refresh(presented, this.metadata(req));
@@ -158,9 +162,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
-    const presented = (req.cookies as Record<string, string> | undefined)?.[
-      REFRESH_COOKIE
-    ];
+    const presented = this.getRefreshTokenFromCookies(req);
     if (presented) await this.auth.logout(presented);
     this.clearRefreshCookie(res);
   }
