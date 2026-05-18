@@ -2,13 +2,14 @@
 
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
-import { useRouter } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useRef } from 'react';
 
 import { useAuth } from '@/lib/auth-context';
 
-export default function OAuthCallbackPage() {
+function OAuthCallbackContent() {
   const router = useRouter();
+  const params = useSearchParams();
   const { refresh } = useAuth();
   const root = useRef<HTMLElement>(null);
 
@@ -31,12 +32,18 @@ export default function OAuthCallbackPage() {
     { scope: root },
   );
 
+  const errorParam = params.get('error');
+
   useEffect(() => {
+    if (errorParam) {
+      router.replace(`/?error=${encodeURIComponent(errorParam)}`);
+      return;
+    }
     void (async () => {
       const token = await refresh();
       router.replace(token ? '/dashboard' : '/?error=oauth_failed');
     })();
-  }, [refresh, router]);
+  }, [refresh, router, errorParam]);
 
   return (
     <main ref={root} className="flex flex-1 items-center justify-center">
@@ -45,5 +52,19 @@ export default function OAuthCallbackPage() {
         <p className="oauth-text text-sm">Finishing sign-in…</p>
       </div>
     </main>
+  );
+}
+
+export default function OAuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex flex-1 items-center justify-center">
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        </main>
+      }
+    >
+      <OAuthCallbackContent />
+    </Suspense>
   );
 }

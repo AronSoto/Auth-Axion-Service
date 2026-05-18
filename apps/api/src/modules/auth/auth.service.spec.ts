@@ -314,3 +314,173 @@ describe('AuthService.validateLocalCredentials — email verification gate', () 
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });
+
+describe('AuthService.validateLocalCredentials — non-happy paths', () => {
+  let auth: AuthService;
+  let prisma: PrismaService;
+
+  beforeAll(async () => {
+    const moduleRef = await buildIntegrationModule([
+      AuthService,
+      TokenService,
+      UsersService,
+      {
+        provide: MailService,
+        useValue: {
+          sendVerificationEmail: jest.fn(),
+          sendPasswordResetEmail: jest.fn(),
+        },
+      },
+    ]);
+    auth = moduleRef.get(AuthService);
+    prisma = moduleRef.get(PrismaService);
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  beforeEach(async () => {
+    await truncateAuthTables(prisma);
+  });
+
+  it('unknown email throws the generic Unauthorized (no user enumeration)', async () => {
+    await expect(
+      auth.validateLocalCredentials('ghost@test.dev', 'whatever'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('OAuth-only user (no passwordHash) cannot log in locally', async () => {
+    // Simulates a user that signed up via Google — no local password set.
+    await prisma.user.create({
+      data: { email: 'alice@test.dev', passwordHash: null },
+    });
+
+    await expect(
+      auth.validateLocalCredentials('alice@test.dev', 'Password123!'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('disabled account with correct password throws Account disabled', async () => {
+    const passwordHash = await argon2.hash('Password123!');
+    await prisma.user.create({
+      data: {
+        email: 'alice@test.dev',
+        passwordHash,
+        isActive: false,
+      },
+    });
+
+    await expect(
+      auth.validateLocalCredentials('alice@test.dev', 'Password123!'),
+    ).rejects.toMatchObject({
+      message: 'Account disabled',
+    });
+  });
+});
+
+describe('AuthService — isActive gate on email / password flows', () => {
+  let auth: AuthService;
+  let prisma: PrismaService;
+  let mailMock: {
+    sendVerificationEmail: jest.Mock;
+    sendPasswordResetEmail: jest.Mock;
+  };
+
+  beforeAll(async () => {
+    mailMock = {
+      sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+      sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const moduleRef = await buildIntegrationModule([
+      AuthService,
+      TokenService,
+      UsersService,
+      { provide: MailService, useValue: mailMock },
+    ]);
+    auth = moduleRef.get(AuthService);
+    prisma = moduleRef.get(PrismaService);
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  beforeEach(async () => {
+    await truncateAuthTables(prisma);
+    mailMock.sendVerificationEmail.mockClear();
+    mailMock.sendPasswordResetEmail.mockClear();
+  });
+
+  it('resendVerification is silent and sends no mail when the user is disabled', async () => {
+    await prisma.user.create({
+      data: {
+        email: 'alice@test.dev',
+        passwordHash: 'hash',
+        emailVerifiedAt: null,
+        isActive: false,
+      },
+    });
+
+    await expect(
+      auth.resendVerification('alice@test.dev'),
+    ).resolves.toBeUndefined();
+    expect(mailMock.sendVerificationEmail).not.toHaveBeenCalled();
+    expect(await prisma.verificationToken.count()).toBe(0);
+  });
+
+  it('requestPasswordReset is silent and sends no mail when the user is disabled', async () => {
+    await prisma.user.create({
+      data: {
+        email: 'alice@test.dev',
+        passwordHash: 'hash',
+        isActive: false,
+      },
+    });
+
+    await expect(
+      auth.requestPasswordReset('alice@test.dev'),
+    ).resolves.toBeUndefined();
+    expect(mailMock.sendPasswordResetEmail).not.toHaveBeenCalled();
+    expect(await prisma.verificationToken.count()).toBe(0);
+  });
+
+  it('resetPassword refuses if the account was disabled after the token was issued', async () => {
+    // Simulate: user requested reset while active, admin disables them, then user clicks the link.
+    const user = await prisma.user.create({
+      data: { email: 'alice@test.dev', passwordHash: 'old-hash' },
+    });
+
+    await auth.requestPasswordReset('alice@test.dev');
+    const tokenRow = await prisma.verificationToken.findFirst({
+      where: { userId: user.id },
+    });
+    expect(tokenRow).not.toBeNull();
+
+    // The plaintext token is only available to the mailer — we exercise the
+    // same outcome by deactivating the user, then trying the consume path
+    // with a freshly issued plaintext token.
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { isActive: false },
+    });
+
+    // Issue a fresh plaintext token directly so we have the cleartext value
+    // to feed resetPassword (the email path would have it; we don't).
+    const tokens = (auth as unknown as { tokens: TokenService }).tokens;
+    const freshToken = await tokens.issueVerificationToken(
+      user.id,
+      'PASSWORD_RESET',
+      60_000,
+    );
+
+    await expect(
+      auth.resetPassword(freshToken, 'NewPassword123!'),
+    ).rejects.toMatchObject({ message: 'Account disabled' });
+
+    // Password must not have been rotated.
+    const after = await prisma.user.findUnique({ where: { id: user.id } });
+    expect(after?.passwordHash).toBe('old-hash');
+  });
+});

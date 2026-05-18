@@ -35,7 +35,7 @@ export async function buildIntegrationModule(
   >['providers'] = [],
 ): Promise<TestingModule> {
   assertLocalDatabase();
-  return Test.createTestingModule({
+  const moduleRef = await Test.createTestingModule({
     imports: [
       ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../../.env'] }),
       AppConfigModule,
@@ -53,6 +53,8 @@ export async function buildIntegrationModule(
     ],
     providers,
   }).compile();
+  await moduleRef.init();
+  return moduleRef;
 }
 
 export async function truncateAuthTables(prisma: PrismaService): Promise<void> {

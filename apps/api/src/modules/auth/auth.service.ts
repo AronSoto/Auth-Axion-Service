@@ -245,7 +245,7 @@ export class AuthService implements OnModuleInit {
   // Idempotent + silent: never reveals whether an email is registered or already verified.
   async resendVerification(email: string): Promise<void> {
     const user = await this.users.findByEmail(email);
-    if (!user || user.emailVerifiedAt) return;
+    if (!user || !user.isActive || user.emailVerifiedAt) return;
 
     const token = await this.tokens.issueVerificationToken(
       user.id,
@@ -272,7 +272,7 @@ export class AuthService implements OnModuleInit {
   //Idempotent + silent: never reveals whether an email is registered.
   async requestPasswordReset(email: string): Promise<void> {
     const user = await this.users.findByEmail(email);
-    if (!user) return;
+    if (!user || !user.isActive) return;
 
     const token = await this.tokens.issueVerificationToken(
       user.id,
@@ -292,6 +292,11 @@ export class AuthService implements OnModuleInit {
       token,
       VerificationTokenType.PASSWORD_RESET,
     );
+
+    const user = await this.users.findById(userId);
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Account disabled');
+    }
 
     const passwordHash = await argon2.hash(newPassword);
 
