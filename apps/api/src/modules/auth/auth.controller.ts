@@ -9,6 +9,7 @@ import {
   Req,
   Res,
   UnauthorizedException,
+  UseFilters,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -36,6 +37,7 @@ import { RegisterDto } from './dto/register.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { OAuthCallbackFilter } from './filters/oauth-callback.filter';
 import { GithubAuthGuard } from './guards/github-auth.guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -152,6 +154,7 @@ export class AuthController {
     return { accessToken: tokens.accessToken };
   }
 
+  // Public — expired access token can still log out.
   @Public()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -240,6 +243,7 @@ export class AuthController {
   @Public()
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
+  @UseFilters(OAuthCallbackFilter)
   @ApiOperation({ summary: 'Google OAuth callback' })
   googleCallback(@Req() req: Request, @Res() res: Response): Promise<void> {
     return this.handleOAuthCallback(req, res);
@@ -255,12 +259,13 @@ export class AuthController {
   @Public()
   @Get('github/callback')
   @UseGuards(GithubAuthGuard)
+  @UseFilters(OAuthCallbackFilter)
   @ApiOperation({ summary: 'GitHub OAuth callback' })
   githubCallback(@Req() req: Request, @Res() res: Response): Promise<void> {
     return this.handleOAuthCallback(req, res);
   }
 
-  // Shared by both OAuth providers
+  // Shared by both OAuth providers. Failures handled by OAuthCallbackFilter.
   private async handleOAuthCallback(
     req: Request,
     res: Response,
