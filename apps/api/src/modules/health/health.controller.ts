@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { Public } from '@/common/decorators/public.decorator';
@@ -19,12 +19,13 @@ export class HealthController {
   @Public()
   @Get('ready')
   @ApiOperation({ summary: 'Readiness probe — checks the DB connection' })
-  async readiness(): Promise<{ status: 'ok' | 'degraded'; db: 'up' | 'down' }> {
+  async readiness(): Promise<{ status: 'ok'; db: 'up' }> {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
       return { status: 'ok', db: 'up' };
     } catch {
-      return { status: 'degraded', db: 'down' };
+      // 503 so orchestrators drop the pod.
+      throw new ServiceUnavailableException({ status: 'degraded', db: 'down' });
     }
   }
 }

@@ -33,6 +33,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     let message: string | string[] = 'Internal server error';
     let error: string | undefined;
+    let stack: string | undefined;
 
     if (exception instanceof HttpException) {
       const r = exception.getResponse();
@@ -44,10 +45,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
         error = body.error;
       }
     } else if (exception instanceof Error) {
-      this.logger.error(exception.message, exception.stack);
+      message = exception.message;
+      stack = exception.stack;
     } else {
-      this.logger.error('Unknown exception', String(exception));
+      message = `Unknown exception: ${String(exception)}`;
     }
+
+    this.logFailure(status, request, message, stack);
 
     const body: ErrorResponseBody = {
       statusCode: status,
@@ -59,5 +63,29 @@ export class HttpExceptionFilter implements ExceptionFilter {
     };
 
     response.status(status).json(body);
+  }
+
+  private logFailure(
+    status: HttpStatus,
+    request: Request,
+    message: string | string[],
+    stack?: string,
+  ): void {
+    const level =
+      status === HttpStatus.UNAUTHORIZED || status === HttpStatus.FORBIDDEN
+        ? 'warn'
+        : status >= HttpStatus.INTERNAL_SERVER_ERROR
+          ? 'error'
+          : null;
+    if (!level) return;
+
+    const ip = request.ip ?? request.socket?.remoteAddress ?? 'unknown';
+    const text = Array.isArray(message) ? message.join('; ') : message;
+    const line = `${status} ${request.method} ${request.url} from ${ip} — ${text}`;
+    if (level === 'error' && stack) {
+      this.logger.error(line, stack);
+    } else {
+      this.logger[level](line);
+    }
   }
 }

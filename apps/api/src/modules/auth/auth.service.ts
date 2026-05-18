@@ -1,12 +1,15 @@
+import { randomBytes } from 'crypto';
+
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
+  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import { VerificationTokenType } from '@prisma/client';
+import { User, VerificationTokenType } from '@prisma/client';
 
 import { AppConfigService } from '@/config/app-config.service';
 import { MailService } from '@/modules/mail/mail.service';
@@ -30,8 +33,9 @@ interface AuthResult {
 }
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
+  private dummyPasswordHash!: string;
 
   constructor(
     private readonly users: UsersService,
@@ -41,18 +45,26 @@ export class AuthService {
     private readonly config: AppConfigService,
   ) {}
 
+  async onModuleInit(): Promise<void> {
+    this.dummyPasswordHash = await argon2.hash(
+      randomBytes(32).toString('base64url'),
+    );
+  }
+
   async validateLocalCredentials(
     email: string,
     password: string,
   ): Promise<AuthenticatedUser | null> {
     const user = await this.users.findByEmail(email);
-    if (!user || !user.passwordHash) return null;
 
-    const valid = await argon2.verify(user.passwordHash, password);
-    if (!valid) return null;
+    // Always verify, even without a user.
+    const hashToVerify = user?.passwordHash ?? this.dummyPasswordHash;
+    const passwordMatches = await argon2.verify(hashToVerify, password);
+
+    if (!user || !user.passwordHash || !passwordMatches) return null;
     if (!user.isActive) throw new UnauthorizedException('Account disabled');
 
-    // Checked after password to avoid leaking verified-vs-unverified via timing.
+    // Checked after password to avoid timing leak.
     if (this.config.requireEmailVerification && !user.emailVerifiedAt) {
       throw new ForbiddenException({
         message: 'Email not verified',
@@ -137,7 +149,7 @@ export class AuthService {
     await this.tokens.revokeAllForUser(userId);
   }
 
-  // Idempotent + race-safe via the provider/providerAccountId unique key.
+  // Idempotent via provider/providerAccountId unique key.
   async handleOAuthLogin(
     profile: OAuthProfile,
     metadata?: RequestMetadata,
@@ -145,17 +157,56 @@ export class AuthService {
     const email = profile.email.toLowerCase();
     const emailVerifiedAt = profile.emailVerified ? new Date() : null;
 
-    // Re-login must not clobber locally-set profile fields.
-    const user = await this.prisma.user.upsert({
-      where: { email },
-      create: {
-        email,
-        name: profile.name,
-        avatarUrl: profile.avatarUrl,
-        emailVerifiedAt,
+    // Known OAuth identity is always safe to reuse.
+    const existingAccount = await this.prisma.account.findUnique({
+      where: {
+        provider_providerAccountId: {
+          provider: profile.provider,
+          providerAccountId: profile.providerAccountId,
+        },
       },
-      update: {},
+      select: { userId: true },
     });
+
+    let user: User;
+    if (existingAccount) {
+      user = await this.prisma.user.findUniqueOrThrow({
+        where: { id: existingAccount.userId },
+      });
+    } else if (!profile.emailVerified) {
+      // Block linking unverified OAuth to existing users.
+      const collision = await this.prisma.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+      if (collision) {
+        throw new UnauthorizedException(
+          'OAuth email is not verified by the provider — cannot link to existing account',
+        );
+      }
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          name: profile.name,
+          avatarUrl: profile.avatarUrl,
+          emailVerifiedAt: null,
+        },
+      });
+    } else {
+      // Verified email: safe to create or link.
+      user = await this.prisma.user.upsert({
+        where: { email },
+        create: {
+          email,
+          name: profile.name,
+          avatarUrl: profile.avatarUrl,
+          emailVerifiedAt,
+        },
+        update: {},
+      });
+    }
+
+    if (!user.isActive) throw new UnauthorizedException('Account disabled');
 
     if (emailVerifiedAt && user.emailVerifiedAt === null) {
       await this.prisma.user.updateMany({
@@ -164,22 +215,15 @@ export class AuthService {
       });
     }
 
-    await this.prisma.account.upsert({
-      where: {
-        provider_providerAccountId: {
+    if (!existingAccount) {
+      await this.prisma.account.create({
+        data: {
           provider: profile.provider,
           providerAccountId: profile.providerAccountId,
+          userId: user.id,
         },
-      },
-      create: {
-        provider: profile.provider,
-        providerAccountId: profile.providerAccountId,
-        userId: user.id,
-      },
-      update: {},
-    });
-
-    if (!user.isActive) throw new UnauthorizedException('Account disabled');
+      });
+    }
 
     const authUser: AuthenticatedUser = {
       id: user.id,

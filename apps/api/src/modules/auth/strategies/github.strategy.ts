@@ -40,11 +40,15 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
     profile: Profile,
     done: GithubVerifyCallback,
   ): void {
-    const email = profile.emails?.[0]?.value;
-    if (!email) {
+    // Pick only emails GitHub flagged verified.
+    const verifiedEmail = profile.emails?.find(
+      (e) => (e as { verified?: boolean }).verified === true,
+    )?.value;
+
+    if (!verifiedEmail) {
       done(
         new Error(
-          'GitHub profile missing email — ensure user:email scope is granted',
+          'GitHub profile has no verified email — user must verify their GitHub email first',
         ),
       );
       return;
@@ -53,10 +57,10 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
     const oauthProfile: OAuthProfile = {
       provider: AuthProvider.GITHUB,
       providerAccountId: profile.id,
-      email,
+      email: verifiedEmail,
       name: profile.displayName ?? profile.username,
       avatarUrl: profile.photos?.[0]?.value,
-      emailVerified: true, // GitHub returns only verified emails when scope=user:email
+      emailVerified: true,
       accessToken,
       refreshToken,
     };

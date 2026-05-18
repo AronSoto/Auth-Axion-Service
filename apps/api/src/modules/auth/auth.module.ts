@@ -9,9 +9,6 @@ import { UsersModule } from '@/modules/users/users.module';
 
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { GithubAuthGuard } from './guards/github-auth.guard';
-import { GoogleAuthGuard } from './guards/google-auth.guard';
-import { LocalAuthGuard } from './guards/local-auth.guard';
 import { GithubStrategy } from './strategies/github.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -41,9 +38,6 @@ import { TokenService } from './token.service';
     JwtStrategy,
     GoogleStrategy,
     GithubStrategy,
-    LocalAuthGuard,
-    GoogleAuthGuard,
-    GithubAuthGuard,
   ],
   exports: [AuthService, TokenService],
 })
