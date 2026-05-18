@@ -1,7 +1,6 @@
 import { randomBytes } from 'crypto';
 
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -54,14 +53,16 @@ export class AuthService implements OnModuleInit {
   async validateLocalCredentials(
     email: string,
     password: string,
-  ): Promise<AuthenticatedUser | null> {
+  ): Promise<AuthenticatedUser> {
     const user = await this.users.findByEmail(email);
 
     // Always verify, even without a user.
     const hashToVerify = user?.passwordHash ?? this.dummyPasswordHash;
     const passwordMatches = await argon2.verify(hashToVerify, password);
 
-    if (!user || !user.passwordHash || !passwordMatches) return null;
+    if (!user || !user.passwordHash || !passwordMatches) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
     if (!user.isActive) throw new UnauthorizedException('Account disabled');
 
     // Checked after password to avoid timing leak.
@@ -108,6 +109,7 @@ export class AuthService implements OnModuleInit {
       email: user.email,
       role: user.role,
     };
+    // Verification gate applies on next login, not register.
     const tokens = await this.tokens.issueTokensForUser(authUser, metadata);
     return { user: authUser, tokens };
   }
@@ -157,73 +159,79 @@ export class AuthService implements OnModuleInit {
     const email = profile.email.toLowerCase();
     const emailVerifiedAt = profile.emailVerified ? new Date() : null;
 
-    // Known OAuth identity is always safe to reuse.
-    const existingAccount = await this.prisma.account.findUnique({
-      where: {
-        provider_providerAccountId: {
-          provider: profile.provider,
-          providerAccountId: profile.providerAccountId,
+    // Provisioning atomic; tokens intentionally outside.
+    const user = await this.prisma.$transaction(async (tx) => {
+      const existingAccount = await tx.account.findUnique({
+        where: {
+          provider_providerAccountId: {
+            provider: profile.provider,
+            providerAccountId: profile.providerAccountId,
+          },
         },
-      },
-      select: { userId: true },
-    });
+        select: { userId: true },
+      });
 
-    let user: User;
-    if (existingAccount) {
-      user = await this.prisma.user.findUniqueOrThrow({
-        where: { id: existingAccount.userId },
-      });
-    } else if (!profile.emailVerified) {
-      // Block linking unverified OAuth to existing users.
-      const collision = await this.prisma.user.findUnique({
-        where: { email },
-        select: { id: true },
-      });
-      if (collision) {
-        throw new UnauthorizedException(
-          'OAuth email is not verified by the provider — cannot link to existing account',
-        );
+      let resolved: User;
+      if (existingAccount) {
+        resolved = await tx.user.findUniqueOrThrow({
+          where: { id: existingAccount.userId },
+        });
+      } else if (!profile.emailVerified) {
+        // Block linking unverified OAuth to existing users.
+        const collision = await tx.user.findUnique({
+          where: { email },
+          select: { id: true },
+        });
+        if (collision) {
+          throw new UnauthorizedException(
+            'OAuth email is not verified by the provider — cannot link to existing account',
+          );
+        }
+        resolved = await tx.user.create({
+          data: {
+            email,
+            name: profile.name,
+            avatarUrl: profile.avatarUrl,
+            emailVerifiedAt: null,
+          },
+        });
+      } else {
+        // Verified email: safe to create or link.
+        resolved = await tx.user.upsert({
+          where: { email },
+          create: {
+            email,
+            name: profile.name,
+            avatarUrl: profile.avatarUrl,
+            emailVerifiedAt,
+          },
+          update: {},
+        });
       }
-      user = await this.prisma.user.create({
-        data: {
-          email,
-          name: profile.name,
-          avatarUrl: profile.avatarUrl,
-          emailVerifiedAt: null,
-        },
-      });
-    } else {
-      // Verified email: safe to create or link.
-      user = await this.prisma.user.upsert({
-        where: { email },
-        create: {
-          email,
-          name: profile.name,
-          avatarUrl: profile.avatarUrl,
-          emailVerifiedAt,
-        },
-        update: {},
-      });
-    }
 
-    if (!user.isActive) throw new UnauthorizedException('Account disabled');
+      if (!resolved.isActive) {
+        throw new UnauthorizedException('Account disabled');
+      }
 
-    if (emailVerifiedAt && user.emailVerifiedAt === null) {
-      await this.prisma.user.updateMany({
-        where: { id: user.id, emailVerifiedAt: null },
-        data: { emailVerifiedAt },
-      });
-    }
+      if (emailVerifiedAt && resolved.emailVerifiedAt === null) {
+        await tx.user.updateMany({
+          where: { id: resolved.id, emailVerifiedAt: null },
+          data: { emailVerifiedAt },
+        });
+      }
 
-    if (!existingAccount) {
-      await this.prisma.account.create({
-        data: {
-          provider: profile.provider,
-          providerAccountId: profile.providerAccountId,
-          userId: user.id,
-        },
-      });
-    }
+      if (!existingAccount) {
+        await tx.account.create({
+          data: {
+            provider: profile.provider,
+            providerAccountId: profile.providerAccountId,
+            userId: resolved.id,
+          },
+        });
+      }
+
+      return resolved;
+    });
 
     const authUser: AuthenticatedUser = {
       id: user.id,
@@ -232,20 +240,6 @@ export class AuthService implements OnModuleInit {
     };
     const tokens = await this.tokens.issueTokensForUser(authUser, metadata);
     return { user: authUser, tokens };
-  }
-
-  // Email verification
-  async requestEmailVerification(userId: string): Promise<void> {
-    const user = await this.users.findByIdOrFail(userId);
-    if (user.emailVerifiedAt)
-      throw new BadRequestException('Email already verified');
-
-    const token = await this.tokens.issueVerificationToken(
-      userId,
-      VerificationTokenType.EMAIL_VERIFICATION,
-      VERIFICATION_TOKEN_TTL_MS,
-    );
-    await this.mail.sendVerificationEmail(user.email, token);
   }
 
   // Idempotent + silent: never reveals whether an email is registered or already verified.

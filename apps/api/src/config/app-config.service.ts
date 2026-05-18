@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { Env } from './env.validation';
+import { isGithubOAuthConfigured, isGoogleOAuthConfigured } from './oauth-env';
 
 @Injectable()
 export class AppConfigService {
@@ -33,10 +34,6 @@ export class AppConfigService {
   get frontendUrl(): string {
     return this.get('FRONTEND_URL');
   }
-  get cookieSecret(): string {
-    return this.get('COOKIE_SECRET') ?? this.get('JWT_ACCESS_SECRET');
-  }
-
   get throttle(): { ttl: number; limit: number } {
     return { ttl: this.get('THROTTLE_TTL'), limit: this.get('THROTTLE_LIMIT') };
   }
@@ -103,12 +100,10 @@ export class AppConfigService {
   }
 
   get isGoogleConfigured(): boolean {
-    const g = this.google;
-    return Boolean(g.clientId && g.clientSecret && g.callbackUrl);
+    return isGoogleOAuthConfigured();
   }
 
   get isGithubConfigured(): boolean {
-    const g = this.github;
-    return Boolean(g.clientId && g.clientSecret && g.callbackUrl);
+    return isGithubOAuthConfigured();
   }
 }

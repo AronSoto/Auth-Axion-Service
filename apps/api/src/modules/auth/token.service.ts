@@ -3,7 +3,7 @@ import { randomBytes, createHash } from 'crypto';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import ms, { type StringValue } from 'ms';
-import { Prisma, RefreshToken, VerificationTokenType } from '@prisma/client';
+import { VerificationTokenType } from '@prisma/client';
 
 import { AppConfigService } from '@/config/app-config.service';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -218,6 +218,3 @@ export class TokenService {
     return { userId: record.userId };
   }
 }
-
-// Re-exports used by tests / consumers
-export type { Prisma, RefreshToken };

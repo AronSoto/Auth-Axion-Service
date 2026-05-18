@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { AuthProvider } from '@prisma/client';
 import { Profile, Strategy, VerifyCallback } from 'passport-google-oauth20';
@@ -7,27 +7,17 @@ import { AppConfigService } from '@/config/app-config.service';
 
 import { OAuthProfile } from '../auth.types';
 
-const PLACEHOLDER = 'NOT_CONFIGURED';
-
+// Registered only when Google OAuth env is configured (see AuthModule).
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
-  private readonly logger = new Logger(GoogleStrategy.name);
-
   constructor(config: AppConfigService) {
     const { clientId, clientSecret, callbackUrl } = config.google;
     super({
-      clientID: clientId ?? PLACEHOLDER,
-      clientSecret: clientSecret ?? PLACEHOLDER,
-      callbackURL:
-        callbackUrl ?? 'http://localhost:3000/api/auth/google/callback',
+      clientID: clientId!,
+      clientSecret: clientSecret!,
+      callbackURL: callbackUrl!,
       scope: ['email', 'profile'],
     });
-
-    if (!config.isGoogleConfigured) {
-      this.logger.warn(
-        'Google OAuth env vars are missing — /auth/google will fail until configured.',
-      );
-    }
   }
 
   validate(

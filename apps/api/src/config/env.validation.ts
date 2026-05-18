@@ -19,10 +19,15 @@ export const envSchema = z
       .string()
       .min(32, 'JWT_REFRESH_SECRET must be at least 32 chars'),
     JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
-    COOKIE_SECRET: z.string().min(16).optional(),
 
     THROTTLE_TTL: z.coerce.number().int().positive().default(60),
     THROTTLE_LIMIT: z.coerce.number().int().positive().default(10),
+
+    // Disable in multi-replica or serverless deploys.
+    ENABLE_CRON: z
+      .union([z.boolean(), z.enum(['true', 'false'])])
+      .transform((v) => v === true || v === 'true')
+      .default(true),
 
     // Blocks local login until email is verified; OAuth bypasses.
     REQUIRE_EMAIL_VERIFICATION: z
