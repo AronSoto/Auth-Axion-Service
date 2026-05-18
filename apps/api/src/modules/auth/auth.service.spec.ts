@@ -174,13 +174,34 @@ describe('AuthService.handleOAuthLogin (integration)', () => {
     );
   });
 
-  it('does NOT promote emailVerifiedAt when OAuth says it is unverified', async () => {
+  it('REFUSES to link an unverified OAuth email to an existing local user (account-takeover guard)', async () => {
     await prisma.user.create({
-      data: { email: 'alice@test.dev', emailVerifiedAt: null },
+      data: {
+        email: 'alice@test.dev',
+        passwordHash: 'hash',
+        emailVerifiedAt: null,
+      },
     });
 
-    await auth.handleOAuthLogin(baseProfile({ emailVerified: false }));
+    await expect(
+      auth.handleOAuthLogin(baseProfile({ emailVerified: false })),
+    ).rejects.toThrow(/not verified by the provider/);
 
+    // No account row was created, no user was linked.
+    expect(await prisma.account.count()).toBe(0);
+    const user = await prisma.user.findUnique({
+      where: { email: 'alice@test.dev' },
+    });
+    expect(user?.emailVerifiedAt).toBeNull();
+  });
+
+  it('allows registering a brand-new user via unverified OAuth (no email collision)', async () => {
+    // No pre-existing user — safe to create, but stays unverified.
+    const result = await auth.handleOAuthLogin(
+      baseProfile({ emailVerified: false }),
+    );
+
+    expect(result.user.email).toBe('alice@test.dev');
     const user = await prisma.user.findUnique({
       where: { email: 'alice@test.dev' },
     });

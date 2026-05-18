@@ -2,7 +2,7 @@ import { randomBytes, createHash } from 'crypto';
 
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import type ms from 'ms';
+import ms, { type StringValue } from 'ms';
 import { Prisma, RefreshToken, VerificationTokenType } from '@prisma/client';
 
 import { AppConfigService } from '@/config/app-config.service';
@@ -12,17 +12,6 @@ import { AuthTokens, AuthenticatedUser, JwtAccessPayload } from './auth.types';
 
 const REFRESH_TOKEN_BYTES = 48;
 const VERIFICATION_TOKEN_BYTES = 32;
-
-// Parse a duration string like "15m", "7d", "1h" into milliseconds.
-const parseDurationMs = (duration: string): number => {
-  const match = /^(\d+)([smhd])$/.exec(duration.trim());
-  if (!match) throw new Error(`Invalid duration: "${duration}"`);
-  const value = Number(match[1]);
-  const unit = match[2];
-  const factor =
-    { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 }[unit] ?? 0;
-  return value * factor;
-};
 
 /**
  * Token operations (issuing, hashing, rotation).
@@ -60,7 +49,7 @@ export class TokenService {
     };
     return this.jwt.sign(payload, {
       secret: this.config.jwt.accessSecret,
-      expiresIn: this.config.jwt.accessExpiresIn as ms.StringValue,
+      expiresIn: this.config.jwt.accessExpiresIn as StringValue,
     });
   }
 
@@ -72,7 +61,7 @@ export class TokenService {
     const token = this.generateOpaqueToken(REFRESH_TOKEN_BYTES);
     const tokenHash = this.hashToken(token);
     const expiresAt = new Date(
-      Date.now() + parseDurationMs(this.config.jwt.refreshExpiresIn),
+      Date.now() + ms(this.config.jwt.refreshExpiresIn as StringValue),
     );
 
     await this.prisma.refreshToken.create({
@@ -121,7 +110,7 @@ export class TokenService {
     const newPlain = this.generateOpaqueToken(REFRESH_TOKEN_BYTES);
     const newHash = this.hashToken(newPlain);
     const newExpiresAt = new Date(
-      Date.now() + parseDurationMs(this.config.jwt.refreshExpiresIn),
+      Date.now() + ms(this.config.jwt.refreshExpiresIn as StringValue),
     );
 
     // Atomic rotation: revoke old + insert new in a single transaction.
