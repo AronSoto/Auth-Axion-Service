@@ -47,10 +47,7 @@ export class TokenService {
       role: user.role,
       type: 'access',
     };
-    return this.jwt.sign(payload, {
-      secret: this.config.jwt.accessSecret,
-      expiresIn: this.config.jwt.accessExpiresIn as StringValue,
-    });
+    return this.jwt.sign(payload);
   }
 
   // Refresh token
