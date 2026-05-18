@@ -44,11 +44,6 @@ export class UsersService {
     });
   }
 
-  /** Used internally during local-strategy login — returns the full user, including passwordHash. */
-  async findByEmailWithPassword(email: string): Promise<User | null> {
-    return this.findByEmail(email);
-  }
-
   async create(input: {
     email: string;
     name?: string;

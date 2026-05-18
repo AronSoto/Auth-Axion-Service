@@ -256,9 +256,17 @@ export class AuthService {
     );
 
     const passwordHash = await argon2.hash(newPassword);
-    await this.users.updatePasswordHash(userId, passwordHash);
 
-    // Force re-auth on every device after a password change.
-    await this.tokens.revokeAllForUser(userId);
+    // Atomic: password change and session revocation must succeed together.
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
   }
 }
