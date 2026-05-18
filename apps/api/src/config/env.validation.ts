@@ -23,6 +23,12 @@ export const envSchema = z
     THROTTLE_TTL: z.coerce.number().int().positive().default(60),
     THROTTLE_LIMIT: z.coerce.number().int().positive().default(10),
 
+    // Disable in multi-replica or serverless deploys.
+    ENABLE_CRON: z
+      .union([z.boolean(), z.enum(['true', 'false'])])
+      .transform((v) => v === true || v === 'true')
+      .default(true),
+
     // Blocks local login until email is verified; OAuth bypasses.
     REQUIRE_EMAIL_VERIFICATION: z
       .union([z.boolean(), z.enum(['true', 'false'])])

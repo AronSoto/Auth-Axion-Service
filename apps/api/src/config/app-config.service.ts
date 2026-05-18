@@ -41,6 +41,10 @@ export class AppConfigService {
     return this.get('REQUIRE_EMAIL_VERIFICATION');
   }
 
+  get enableCron(): boolean {
+    return this.get('ENABLE_CRON');
+  }
+
   get jwt(): {
     accessSecret: string;
     accessExpiresIn: string;

@@ -15,10 +15,13 @@ import { TokensCleanupModule } from './modules/tokens-cleanup/tokens-cleanup.mod
 import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
 
+// Read at boot — DI not available when imports[] is evaluated.
+const cronEnabled = process.env.ENABLE_CRON !== 'false';
+
 @Module({
   imports: [
     AppConfigModule,
-    ScheduleModule.forRoot(),
+    ...(cronEnabled ? [ScheduleModule.forRoot(), TokensCleanupModule] : []),
     ThrottlerModule.forRootAsync({
       imports: [AppConfigModule],
       inject: [AppConfigService],
@@ -35,7 +38,6 @@ import { PrismaModule } from './prisma/prisma.module';
     AuthModule,
     HealthModule,
     AdminModule,
-    TokensCleanupModule,
   ],
   providers: [
     // Order matters: rate-limit -> authn -> authz.

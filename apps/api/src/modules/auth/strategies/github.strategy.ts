@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { AuthProvider } from '@prisma/client';
 import { Profile, Strategy } from 'passport-github2';
@@ -11,26 +11,18 @@ type GithubVerifyCallback = (
   err: Error | null,
   user?: OAuthProfile | false,
 ) => void;
-const PLACEHOLDER = 'NOT_CONFIGURED';
 
+// Registered only when GitHub OAuth env is configured (see AuthModule).
 @Injectable()
 export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
-  private readonly logger = new Logger(GithubStrategy.name);
-
   constructor(config: AppConfigService) {
     const { clientId, clientSecret, callbackUrl } = config.github;
     super({
-      clientID: clientId ?? PLACEHOLDER,
-      clientSecret: clientSecret ?? PLACEHOLDER,
-      callbackURL: callbackUrl ?? PLACEHOLDER,
+      clientID: clientId!,
+      clientSecret: clientSecret!,
+      callbackURL: callbackUrl!,
       scope: ['user:email'],
     });
-
-    if (!config.isGithubConfigured) {
-      this.logger.warn(
-        'GitHub OAuth env vars are missing — /auth/github will fail until configured.',
-      );
-    }
   }
 
   validate(
