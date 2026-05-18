@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { Env } from './env.validation';
+import { isGithubOAuthConfigured, isGoogleOAuthConfigured } from './oauth-env';
 
 @Injectable()
 export class AppConfigService {
@@ -39,10 +40,6 @@ export class AppConfigService {
 
   get requireEmailVerification(): boolean {
     return this.get('REQUIRE_EMAIL_VERIFICATION');
-  }
-
-  get enableCron(): boolean {
-    return this.get('ENABLE_CRON');
   }
 
   get jwt(): {
@@ -103,12 +100,10 @@ export class AppConfigService {
   }
 
   get isGoogleConfigured(): boolean {
-    const g = this.google;
-    return Boolean(g.clientId && g.clientSecret && g.callbackUrl);
+    return isGoogleOAuthConfigured();
   }
 
   get isGithubConfigured(): boolean {
-    const g = this.github;
-    return Boolean(g.clientId && g.clientSecret && g.callbackUrl);
+    return isGithubOAuthConfigured();
   }
 }
