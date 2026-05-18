@@ -10,10 +10,10 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-
 import { SessionExpiredOverlay } from '@/components/session-expired-overlay';
-
 import { ApiError, UserProfile, authApi, registerAuthBridge } from './api';
+
+export type SessionEndReason = 'expired' | 'signedOut';
 
 interface AuthContextValue {
   user: UserProfile | null;
@@ -21,9 +21,10 @@ interface AuthContextValue {
   isLoading: boolean;
   // True only after the initial silent-refresh attempt has finished.
   isReady: boolean;
-  // True when a previously-active session was just invalidated (refresh failed).
-  sessionExpired: boolean;
-  dismissSessionExpired: () => void;
+  // Non-null when a previously-active session was just invalidated. The
+  // overlay reads `reason` to pick the right copy.
+  sessionEndedReason: SessionEndReason | null;
+  dismissSessionEnded: () => void;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -61,9 +62,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionExpired, setSessionExpired] = useState(false);
+  const [sessionEndedReason, setSessionEndedReason] = useState<SessionEndReason | null>(null);
 
-  const dismissSessionExpired = useCallback(() => setSessionExpired(false), []);
+  const dismissSessionEnded = useCallback(() => setSessionEndedReason(null), []);
 
   // Prevents double-fire under React strict-mode.
   const didInit = useRef(false);
@@ -95,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (err instanceof ApiError && err.status === 401) {
           // Overlay only if this tab actually had a session before.
           if (accessTokenRef.current !== null || hadSession()) {
-            setSessionExpired(true);
+            setSessionEndedReason('expired');
           }
           clearSessionMark();
           setUser(null);
@@ -142,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     bc.onmessage = (e: MessageEvent<AuthBroadcast>) => {
       if (e.data?.type !== 'logout') return;
       if (accessTokenRef.current !== null || hadSession()) {
-        setSessionExpired(true);
+        setSessionEndedReason('signedOut');
       }
       clearLocalSession();
     };
@@ -169,7 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAccessToken(accessToken);
       accessTokenRef.current = accessToken;
       markSession();
-      setSessionExpired(false);
+      setSessionEndedReason(null);
       try {
         const profile = await authApi.me();
         setUser(profile);
@@ -213,7 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authApi.logout();
     } finally {
       clearLocalSession();
-      setSessionExpired(false);
+      setSessionEndedReason(null);
       broadcastRef.current?.postMessage({ type: 'logout' } satisfies AuthBroadcast);
     }
   }, [clearLocalSession]);
@@ -224,8 +225,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accessToken,
       isLoading,
       isReady,
-      sessionExpired,
-      dismissSessionExpired,
+      sessionEndedReason,
+      dismissSessionEnded,
       login,
       register,
       logout,
@@ -236,8 +237,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accessToken,
       isLoading,
       isReady,
-      sessionExpired,
-      dismissSessionExpired,
+      sessionEndedReason,
+      dismissSessionEnded,
       login,
       register,
       logout,
@@ -248,7 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={value}>
       {children}
-      <SessionExpiredOverlay open={sessionExpired} onDismiss={dismissSessionExpired} />
+      <SessionExpiredOverlay reason={sessionEndedReason} onDismiss={dismissSessionEnded} />
     </AuthContext.Provider>
   );
 }

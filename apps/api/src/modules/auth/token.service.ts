@@ -43,8 +43,6 @@ export class TokenService {
   signAccessToken(user: AuthUser): string {
     const payload: JwtAccessPayload = {
       sub: user.id,
-      email: user.email,
-      role: user.role,
       type: 'access',
     };
     return this.jwt.sign(payload);

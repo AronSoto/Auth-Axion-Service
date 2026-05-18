@@ -8,8 +8,6 @@ export interface AuthUser {
 
 export interface JwtAccessPayload {
   sub: string;
-  email: string;
-  role: string;
   type: 'access';
 }
 

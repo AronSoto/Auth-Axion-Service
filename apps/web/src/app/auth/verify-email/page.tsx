@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 
 import { Logo } from '@/components/logo';
 import { Button, Card } from '@/components/ui';
@@ -23,8 +23,12 @@ function VerifyEmailContent() {
 
   usePageEntry([status]);
 
+  //Single-use token, Strict Mode crash
+  const submitted = useRef(false);
+
   useEffect(() => {
-    if (!token) return;
+    if (!token || submitted.current) return;
+    submitted.current = true;
     void authApi.verifyEmail(token).then(
       () => setStatus('success'),
       (err: unknown) => {

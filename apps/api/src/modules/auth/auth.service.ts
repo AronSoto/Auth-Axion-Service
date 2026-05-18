@@ -16,6 +16,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { UsersService } from '@/modules/users/users.service';
 
 import { AuthTokens, AuthUser, OAuthProfile } from './auth.types';
+import { OAUTH_ERROR_CODES, OAuthException } from './oauth-errors';
 import { TokenService } from './token.service';
 
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
@@ -180,7 +181,8 @@ export class AuthService implements OnModuleInit {
           select: { id: true },
         });
         if (collision) {
-          throw new UnauthorizedException(
+          throw new OAuthException(
+            OAUTH_ERROR_CODES.unverified,
             'OAuth email is not verified by the provider — cannot link to existing account',
           );
         }
@@ -207,7 +209,10 @@ export class AuthService implements OnModuleInit {
       }
 
       if (!resolved.isActive) {
-        throw new UnauthorizedException('Account disabled');
+        throw new OAuthException(
+          OAUTH_ERROR_CODES.disabled,
+          'Account disabled',
+        );
       }
 
       if (emailVerifiedAt && resolved.emailVerifiedAt === null) {

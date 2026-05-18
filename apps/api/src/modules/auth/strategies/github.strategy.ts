@@ -6,6 +6,7 @@ import { Profile, Strategy } from 'passport-github2';
 import { AppConfigService } from '@/config/app-config.service';
 
 import { OAuthProfile } from '../auth.types';
+import { OAUTH_ERROR_CODES, OAuthException } from '../oauth-errors';
 
 type GithubVerifyCallback = (
   err: Error | null,
@@ -38,7 +39,8 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
 
     if (!verifiedEmail) {
       done(
-        new Error(
+        new OAuthException(
+          OAUTH_ERROR_CODES.unverified,
           'GitHub profile has no verified email — user must verify their GitHub email first',
         ),
       );

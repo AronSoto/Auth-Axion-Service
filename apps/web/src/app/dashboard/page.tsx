@@ -12,12 +12,11 @@ import { useAuth } from '@/lib/auth-context';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, isReady, sessionExpired, logout } = useAuth();
+  const { user, isReady, sessionEndedReason, logout } = useAuth();
 
   useEffect(() => {
-    // Let the overlay own the redirect when a session has just expired.
-    if (isReady && !user && !sessionExpired) router.replace('/');
-  }, [isReady, user, sessionExpired, router]);
+    if (isReady && !user && !sessionEndedReason) router.replace('/');
+  }, [isReady, user, sessionEndedReason, router]);
 
   // Custom dashboard timeline — header → main card → resource grid.
   // Re-runs once the auth guard resolves (user/isReady become truthy).
