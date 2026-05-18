@@ -206,6 +206,8 @@ export class AuthService implements OnModuleInit {
       });
     }
 
+    if (!user.isActive) throw new UnauthorizedException('Account disabled');
+
     if (emailVerifiedAt && user.emailVerifiedAt === null) {
       await this.prisma.user.updateMany({
         where: { id: user.id, emailVerifiedAt: null },
@@ -222,8 +224,6 @@ export class AuthService implements OnModuleInit {
         },
       });
     }
-
-    if (!user.isActive) throw new UnauthorizedException('Account disabled');
 
     const authUser: AuthenticatedUser = {
       id: user.id,

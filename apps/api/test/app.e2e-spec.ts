@@ -32,7 +32,8 @@ describe('Health (e2e)', () => {
       .get('/api/health')
       .expect(200)
       .expect((res) => {
-        expect(res.body.data).toMatchObject({ status: 'ok' });
+        const body = res.body as { data: { status: string } };
+        expect(body.data).toMatchObject({ status: 'ok' });
       });
   });
 });

@@ -33,7 +33,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     let message: string | string[] = 'Internal server error';
     let error: string | undefined;
-
     let stack: string | undefined;
 
     if (exception instanceof HttpException) {
@@ -67,7 +66,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
   }
 
   private logFailure(
-    status: number,
+    status: HttpStatus,
     request: Request,
     message: string | string[],
     stack?: string,
