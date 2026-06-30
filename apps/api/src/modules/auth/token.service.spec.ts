@@ -9,6 +9,7 @@ import {
   truncateAuthTables,
 } from '@/test-utils/integration';
 
+import { AuditService } from '../audit/audit.service';
 import { TokenService } from './token.service';
 
 const hash = (token: string) =>
@@ -20,7 +21,10 @@ describe('TokenService (integration)', () => {
   let userId: string;
 
   beforeAll(async () => {
-    const moduleRef = await buildIntegrationModule([TokenService]);
+    const moduleRef = await buildIntegrationModule([
+      TokenService,
+      { provide: AuditService, useValue: { record: jest.fn() } },
+    ]);
     tokens = moduleRef.get(TokenService);
     prisma = moduleRef.get(PrismaService);
   });

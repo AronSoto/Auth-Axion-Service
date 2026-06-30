@@ -8,13 +8,14 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import { User, VerificationTokenType } from '@prisma/client';
+import { SecurityEventType, User, VerificationTokenType } from '@prisma/client';
 
 import { AppConfigService } from '@/config/app-config.service';
 import { MailService } from '@/modules/mail/mail.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { UsersService } from '@/modules/users/users.service';
 
+import { AuditService } from '../audit/audit.service';
 import {
   AuthTokens,
   AuthUser,
@@ -23,6 +24,7 @@ import {
   SessionInfo,
 } from './auth.types';
 import { OAUTH_ERROR_CODES, OAuthException } from './oauth-errors';
+import { PasswordPolicyService } from './password-policy.service';
 import { TokenService } from './token.service';
 
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
@@ -44,6 +46,8 @@ export class AuthService implements OnModuleInit {
     private readonly mail: MailService,
     private readonly prisma: PrismaService,
     private readonly config: AppConfigService,
+    private readonly audit: AuditService,
+    private readonly passwordPolicy: PasswordPolicyService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -55,6 +59,7 @@ export class AuthService implements OnModuleInit {
   async validateLocalCredentials(
     email: string,
     password: string,
+    metadata?: RequestMetadata,
   ): Promise<AuthUser> {
     const user = await this.users.findByEmail(email);
 
@@ -62,19 +67,53 @@ export class AuthService implements OnModuleInit {
     const hashToVerify = user?.passwordHash ?? this.dummyPasswordHash;
     const passwordMatches = await argon2.verify(hashToVerify, password);
 
+    const recordFailure = (detail: string): void =>
+      this.audit.record({
+        type: SecurityEventType.LOGIN_FAILED,
+        userId: user?.id ?? null,
+        email,
+        metadata,
+        detail,
+      });
+
+    // Reject locked accounts regardless of password (timing already spent above).
+    if (user?.lockedUntil && user.lockedUntil > new Date()) {
+      recordFailure('account locked');
+      throw new UnauthorizedException(
+        'Account temporarily locked due to failed attempts. Try again later.',
+      );
+    }
+
     if (!user || !user.passwordHash || !passwordMatches) {
+      if (user) {
+        const { justLocked } = await this.users.registerFailedLogin(user.id);
+        if (justLocked) {
+          this.audit.record({
+            type: SecurityEventType.ACCOUNT_LOCKED,
+            userId: user.id,
+            email,
+            metadata,
+          });
+        }
+      }
+      recordFailure('invalid credentials');
       throw new UnauthorizedException('Invalid email or password');
     }
-    if (!user.isActive) throw new UnauthorizedException('Account disabled');
+    if (!user.isActive) {
+      recordFailure('account disabled');
+      throw new UnauthorizedException('Account disabled');
+    }
 
     // Checked after password to avoid timing leak.
     if (this.config.requireEmailVerification && !user.emailVerifiedAt) {
+      recordFailure('email not verified');
       throw new ForbiddenException({
         message: 'Email not verified',
         code: 'EMAIL_NOT_VERIFIED',
       });
     }
 
+    await this.users.clearLoginFailures(user.id);
     return { id: user.id, email: user.email, role: user.role };
   }
 
@@ -82,6 +121,10 @@ export class AuthService implements OnModuleInit {
     dto: { email: string; password: string; name?: string },
     metadata?: RequestMetadata,
   ): Promise<AuthResult> {
+    await this.passwordPolicy.assertAcceptable(dto.password, [
+      dto.email,
+      dto.name ?? '',
+    ]);
     const passwordHash = await argon2.hash(dto.password);
 
     const user = await this.users.create({
@@ -113,11 +156,24 @@ export class AuthService implements OnModuleInit {
     };
     // Verification gate applies on next login, not register.
     const tokens = await this.tokens.issueTokensForUser(authUser, metadata);
+    this.audit.record({
+      type: SecurityEventType.REGISTER,
+      userId: user.id,
+      email: user.email,
+      metadata,
+    });
     return { user: authUser, tokens };
   }
 
   async login(user: AuthUser, metadata?: RequestMetadata): Promise<AuthTokens> {
-    return this.tokens.issueTokensForUser(user, metadata);
+    const tokens = await this.tokens.issueTokensForUser(user, metadata);
+    this.audit.record({
+      type: SecurityEventType.LOGIN_SUCCESS,
+      userId: user.id,
+      email: user.email,
+      metadata,
+    });
+    return tokens;
   }
 
   async refresh(
@@ -148,6 +204,11 @@ export class AuthService implements OnModuleInit {
 
   async logoutAll(userId: string): Promise<void> {
     await this.tokens.revokeAllForUser(userId);
+    this.audit.record({
+      type: SecurityEventType.SESSION_REVOKED,
+      userId,
+      detail: 'all sessions',
+    });
   }
 
   listSessions(
@@ -157,8 +218,13 @@ export class AuthService implements OnModuleInit {
     return this.tokens.listActiveSessions(userId, presentedRefreshToken);
   }
 
-  revokeSession(userId: string, sessionId: string): Promise<void> {
-    return this.tokens.revokeSessionById(userId, sessionId);
+  async revokeSession(userId: string, sessionId: string): Promise<void> {
+    await this.tokens.revokeSessionById(userId, sessionId);
+    this.audit.record({
+      type: SecurityEventType.SESSION_REVOKED,
+      userId,
+      detail: `session ${sessionId}`,
+    });
   }
 
   // Idempotent via provider/providerAccountId unique key.
@@ -253,6 +319,13 @@ export class AuthService implements OnModuleInit {
       role: user.role,
     };
     const tokens = await this.tokens.issueTokensForUser(authUser, metadata);
+    this.audit.record({
+      type: SecurityEventType.OAUTH_LOGIN,
+      userId: user.id,
+      email: user.email,
+      metadata,
+      detail: profile.provider,
+    });
     return { user: authUser, tokens };
   }
 
@@ -280,6 +353,7 @@ export class AuthService implements OnModuleInit {
       VerificationTokenType.EMAIL_VERIFICATION,
     );
     await this.users.markEmailVerified(userId);
+    this.audit.record({ type: SecurityEventType.EMAIL_VERIFIED, userId });
   }
 
   // Password reset
@@ -299,6 +373,11 @@ export class AuthService implements OnModuleInit {
         err,
       );
     });
+    this.audit.record({
+      type: SecurityEventType.PASSWORD_RESET_REQUESTED,
+      userId: user.id,
+      email: user.email,
+    });
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
@@ -312,6 +391,7 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('Account disabled');
     }
 
+    await this.passwordPolicy.assertAcceptable(newPassword, [user.email]);
     const passwordHash = await argon2.hash(newPassword);
 
     // Atomic: password change and session revocation must succeed together.
@@ -325,5 +405,11 @@ export class AuthService implements OnModuleInit {
         data: { revokedAt: new Date() },
       }),
     ]);
+
+    this.audit.record({
+      type: SecurityEventType.PASSWORD_RESET_COMPLETED,
+      userId,
+      email: user.email,
+    });
   }
 }

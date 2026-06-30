@@ -11,9 +11,21 @@ import {
   truncateAuthTables,
 } from '@/test-utils/integration';
 
+import { AuditService } from '../audit/audit.service';
 import { AuthService } from './auth.service';
 import { OAuthProfile } from './auth.types';
+import { PasswordPolicyService } from './password-policy.service';
 import { TokenService } from './token.service';
+
+// Lightweight stubs so AuthService's new deps don't pull in the DB / network.
+const auditMock = () => ({
+  provide: AuditService,
+  useValue: { record: jest.fn() },
+});
+const passwordPolicyMock = () => ({
+  provide: PasswordPolicyService,
+  useValue: { assertAcceptable: jest.fn() },
+});
 
 const baseProfile = (overrides: Partial<OAuthProfile> = {}): OAuthProfile => ({
   provider: AuthProvider.GOOGLE,
@@ -43,6 +55,8 @@ describe('AuthService.handleOAuthLogin (integration)', () => {
           sendPasswordResetEmail: jest.fn(),
         },
       },
+      auditMock(),
+      passwordPolicyMock(),
     ]);
     auth = moduleRef.get(AuthService);
     prisma = moduleRef.get(PrismaService);
@@ -229,6 +243,8 @@ describe('AuthService.validateLocalCredentials — email verification gate', () 
           sendPasswordResetEmail: jest.fn(),
         },
       },
+      auditMock(),
+      passwordPolicyMock(),
     ]);
     auth = moduleRef.get(AuthService);
     prisma = moduleRef.get(PrismaService);
@@ -331,6 +347,8 @@ describe('AuthService.validateLocalCredentials — non-happy paths', () => {
           sendPasswordResetEmail: jest.fn(),
         },
       },
+      auditMock(),
+      passwordPolicyMock(),
     ]);
     auth = moduleRef.get(AuthService);
     prisma = moduleRef.get(PrismaService);
@@ -398,6 +416,8 @@ describe('AuthService — isActive gate on email / password flows', () => {
       TokenService,
       UsersService,
       { provide: MailService, useValue: mailMock },
+      auditMock(),
+      passwordPolicyMock(),
     ]);
     auth = moduleRef.get(AuthService);
     prisma = moduleRef.get(PrismaService);

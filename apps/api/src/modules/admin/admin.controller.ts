@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import { SecurityEvent, UserRole } from '@prisma/client';
 
 import { Roles } from '@/common/decorators/roles.decorator';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -10,6 +10,8 @@ interface AdminStats {
   activeSessions: number;
   pendingVerifications: number;
 }
+
+const SECURITY_EVENTS_LIMIT = 100;
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -32,5 +34,14 @@ export class AdminController {
         }),
       ]);
     return { users, activeSessions, pendingVerifications };
+  }
+
+  @Get('security-events')
+  @ApiOperation({ summary: 'Recent security audit events (admin only)' })
+  securityEvents(): Promise<SecurityEvent[]> {
+    return this.prisma.securityEvent.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: SECURITY_EVENTS_LIMIT,
+    });
   }
 }

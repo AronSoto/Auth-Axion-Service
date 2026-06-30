@@ -7,7 +7,15 @@ import { Prisma, User, UserRole } from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
 
-export type SafeUser = Omit<User, 'passwordHash'>;
+// Internal security fields (passwordHash, lockout counters) never leave the API.
+export type SafeUser = Omit<
+  User,
+  'passwordHash' | 'failedLoginAttempts' | 'lockedUntil'
+>;
+
+// Brute-force thresholds for local login.
+const MAX_FAILED_LOGINS = 5;
+const LOCK_DURATION_MS = 15 * 60 * 1000; // 15 min
 
 const SAFE_USER_SELECT = {
   id: true,
@@ -90,6 +98,42 @@ export class UsersService {
     await this.prisma.user.update({
       where: { id },
       data: { emailVerifiedAt: new Date() },
+    });
+  }
+
+  // Count a failed local login; lock the account once the threshold is hit.
+  // Returns whether this attempt triggered a fresh lock (for auditing).
+  async registerFailedLogin(id: string): Promise<{ justLocked: boolean }> {
+    const { failedLoginAttempts } = await this.prisma.user.update({
+      where: { id },
+      data: { failedLoginAttempts: { increment: 1 } },
+      select: { failedLoginAttempts: true },
+    });
+
+    if (failedLoginAttempts >= MAX_FAILED_LOGINS) {
+      await this.prisma.user.update({
+        where: { id },
+        data: {
+          lockedUntil: new Date(Date.now() + LOCK_DURATION_MS),
+          failedLoginAttempts: 0,
+        },
+      });
+      return { justLocked: true };
+    }
+    return { justLocked: false };
+  }
+
+  // Clear the counter + lock after a successful login.
+  async clearLoginFailures(id: string): Promise<void> {
+    await this.prisma.user.updateMany({
+      where: {
+        id,
+        OR: [
+          { failedLoginAttempts: { gt: 0 } },
+          { lockedUntil: { not: null } },
+        ],
+      },
+      data: { failedLoginAttempts: 0, lockedUntil: null },
     });
   }
 }

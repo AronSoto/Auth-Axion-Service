@@ -7,12 +7,13 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import ms from 'ms';
-import { VerificationTokenType } from '@prisma/client';
+import { SecurityEventType, VerificationTokenType } from '@prisma/client';
 import { UAParser } from 'ua-parser-js';
 
 import { AppConfigService } from '@/config/app-config.service';
 import { PrismaService } from '@/prisma/prisma.service';
 
+import { AuditService } from '../audit/audit.service';
 import {
   AuthTokens,
   AuthUser,
@@ -37,6 +38,7 @@ export class TokenService {
     private readonly jwt: JwtService,
     private readonly prisma: PrismaService,
     private readonly config: AppConfigService,
+    private readonly audit: AuditService,
   ) {}
 
   // Generic Helpers
@@ -104,6 +106,12 @@ export class TokenService {
     if (existing.revokedAt) {
       // Reuse of a revoked token — likely a stolen token replayed. Burn the chain.
       await this.revokeAllForUser(existing.userId);
+      this.audit.record({
+        type: SecurityEventType.TOKEN_REUSE_DETECTED,
+        userId: existing.userId,
+        metadata,
+        detail: 'revoked token replayed — all sessions revoked',
+      });
       throw new UnauthorizedException(
         'Refresh token reuse detected — all sessions revoked',
       );
