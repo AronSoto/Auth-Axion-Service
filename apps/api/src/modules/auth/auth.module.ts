@@ -10,8 +10,10 @@ import {
 } from '@/config/oauth-env';
 import { UsersModule } from '@/modules/users/users.module';
 
+import { AuditModule } from '../audit/audit.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { PasswordPolicyService } from './password-policy.service';
 import { GithubStrategy } from './strategies/github.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -27,6 +29,7 @@ const oauthStrategies: Provider[] = [
 @Module({
   imports: [
     UsersModule,
+    AuditModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [AppConfigModule],
@@ -43,6 +46,7 @@ const oauthStrategies: Provider[] = [
   providers: [
     AuthService,
     TokenService,
+    PasswordPolicyService,
     LocalStrategy,
     JwtStrategy,
     ...oauthStrategies,
