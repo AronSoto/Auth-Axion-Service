@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint · Format · Types · Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Minimal env so prisma:generate / build have what they read.
+      - name: Write CI env
+        run: |
+          cat > .env <<'EOF'
+          NODE_ENV=test
+          API_PORT=3000
+          API_URL=http://localhost:3000
+          FRONTEND_URL=http://localhost:3001
+          DATABASE_URL=postgresql://axion:axion_dev_password@localhost:5432/auth_axion_test?schema=public
+          JWT_ACCESS_SECRET=ci_only_access_secret_minimum_thirty_two_chars
+          JWT_ACCESS_EXPIRES_IN=15m
+          JWT_REFRESH_EXPIRES_IN=7d
+          MAIL_DRIVER=smtp
+          MAIL_FROM=Auth Axion <noreply@auth-axion.dev>
+          MAIL_SMTP_HOST=localhost
+          MAIL_SMTP_PORT=1025
+          MAIL_SMTP_USER=ci
+          MAIL_SMTP_PASS=ci
+          ENABLE_CRON=false
+          REQUIRE_EMAIL_VERIFICATION=false
+          EOF
+
+      - run: pnpm prisma:generate
+      - run: pnpm lint:check
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm build
+
+  test:
+    name: Tests (unit + e2e)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: axion
+          POSTGRES_PASSWORD: axion_dev_password
+          POSTGRES_DB: auth_axion_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U axion -d auth_axion_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Write CI env
+        run: |
+          cat > .env <<'EOF'
+          NODE_ENV=test
+          API_PORT=3000
+          API_URL=http://localhost:3000
+          FRONTEND_URL=http://localhost:3001
+          DATABASE_URL=postgresql://axion:axion_dev_password@localhost:5432/auth_axion_test?schema=public
+          JWT_ACCESS_SECRET=ci_only_access_secret_minimum_thirty_two_chars
+          JWT_ACCESS_EXPIRES_IN=15m
+          JWT_REFRESH_EXPIRES_IN=7d
+          MAIL_DRIVER=smtp
+          MAIL_FROM=Auth Axion <noreply@auth-axion.dev>
+          MAIL_SMTP_HOST=localhost
+          MAIL_SMTP_PORT=1025
+          MAIL_SMTP_USER=ci
+          MAIL_SMTP_PASS=ci
+          ENABLE_CRON=false
+          REQUIRE_EMAIL_VERIFICATION=false
+          EOF
+
+      - run: pnpm prisma:generate
+      - name: Apply migrations
+        run: pnpm prisma:deploy
+      - name: Unit tests
+        run: pnpm --filter @auth-axion/api test
+      - name: E2E tests
+        run: pnpm --filter @auth-axion/api test:e2e

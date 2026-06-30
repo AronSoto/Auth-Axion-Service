@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { LoggerModule } from './common/logging/logger.module';
 import { AppConfigModule } from './config/app-config.module';
 import { AppConfigService } from './config/app-config.service';
 import { AdminModule } from './modules/admin/admin.module';
@@ -21,6 +22,7 @@ const cronEnabled = process.env.ENABLE_CRON !== 'false';
 @Module({
   imports: [
     AppConfigModule,
+    LoggerModule,
     ...(cronEnabled ? [ScheduleModule.forRoot(), TokensCleanupModule] : []),
     ThrottlerModule.forRootAsync({
       imports: [AppConfigModule],
