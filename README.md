@@ -78,9 +78,8 @@ pnpm install
 cp .env.example .env
 cp apps/web/.env.local.example apps/web/.env.local
 
-# 3. Generate JWT secrets and paste into .env
+# 3. Generate the JWT access secret and paste into .env
 node -e "console.log('JWT_ACCESS_SECRET=' + require('crypto').randomBytes(32).toString('base64'))"
-node -e "console.log('JWT_REFRESH_SECRET=' + require('crypto').randomBytes(32).toString('base64'))"
 
 # 4. Start Postgres (Docker Desktop must be running)
 pnpm db:up

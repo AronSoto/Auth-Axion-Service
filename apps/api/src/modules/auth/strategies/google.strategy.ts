@@ -21,8 +21,8 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   }
 
   validate(
-    accessToken: string,
-    refreshToken: string,
+    _accessToken: string,
+    _refreshToken: string,
     profile: Profile,
     done: VerifyCallback,
   ): void {
@@ -39,8 +39,6 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       name: profile.displayName,
       avatarUrl: profile.photos?.[0]?.value,
       emailVerified: profile.emails?.[0]?.verified === true,
-      accessToken,
-      refreshToken,
     };
     done(null, oauthProfile);
   }

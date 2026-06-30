@@ -27,8 +27,8 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
   }
 
   validate(
-    accessToken: string,
-    refreshToken: string,
+    _accessToken: string,
+    _refreshToken: string,
     profile: Profile,
     done: GithubVerifyCallback,
   ): void {
@@ -54,8 +54,6 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
       name: profile.displayName ?? profile.username,
       avatarUrl: profile.photos?.[0]?.value,
       emailVerified: true,
-      accessToken,
-      refreshToken,
     };
     done(null, oauthProfile);
   }

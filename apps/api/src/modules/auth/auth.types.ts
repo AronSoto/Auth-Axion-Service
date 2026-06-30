@@ -24,6 +24,4 @@ export interface OAuthProfile {
   name?: string;
   avatarUrl?: string;
   emailVerified: boolean;
-  accessToken?: string;
-  refreshToken?: string;
 }

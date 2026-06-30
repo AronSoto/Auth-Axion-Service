@@ -45,13 +45,11 @@ export class AppConfigService {
   get jwt(): {
     accessSecret: string;
     accessExpiresIn: string;
-    refreshSecret: string;
     refreshExpiresIn: string;
   } {
     return {
       accessSecret: this.get('JWT_ACCESS_SECRET'),
       accessExpiresIn: this.get('JWT_ACCESS_EXPIRES_IN'),
-      refreshSecret: this.get('JWT_REFRESH_SECRET'),
       refreshExpiresIn: this.get('JWT_REFRESH_EXPIRES_IN'),
     };
   }
