@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { Logger } from 'nestjs-pino';
 
 import { AppModule } from './app.module';
 import { AppConfigService } from './config/app-config.service';
@@ -14,6 +15,9 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });
+
+  // Route all Nest logs through pino.
+  app.useLogger(app.get(Logger));
 
   const config = app.get(AppConfigService);
 
@@ -61,9 +65,10 @@ async function bootstrap(): Promise<void> {
 
   await app.listen(config.apiPort);
 
-  console.log(`Auth-Axion API: http://localhost:${config.apiPort}/api`);
+  const logger = app.get(Logger);
+  logger.log(`Auth-Axion API: http://localhost:${config.apiPort}/api`);
   if (config.isDevelopment) {
-    console.log(`Swagger docs: http://localhost:${config.apiPort}/api/docs`);
+    logger.log(`Swagger docs: http://localhost:${config.apiPort}/api/docs`);
   }
 }
 
