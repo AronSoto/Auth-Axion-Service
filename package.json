@@ -25,6 +25,7 @@
     "db:reset": "docker compose down -v && docker compose up -d postgres",
     "prisma:generate": "pnpm --filter @auth-axion/api prisma:generate",
     "prisma:migrate": "pnpm --filter @auth-axion/api prisma:migrate",
+    "prisma:deploy": "pnpm --filter @auth-axion/api prisma:deploy",
     "prisma:studio": "pnpm --filter @auth-axion/api prisma:studio",
     "prepare": "husky"
   },
