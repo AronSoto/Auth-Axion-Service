@@ -104,6 +104,16 @@ export interface AuthResponse {
   accessToken: string;
 }
 
+export interface SessionInfo {
+  id: string;
+  browser: string | null;
+  os: string | null;
+  ipAddress: string | null;
+  createdAt: string;
+  expiresAt: string;
+  current: boolean;
+}
+
 export const authApi = {
   register: (input: { email: string; password: string; name?: string }) =>
     apiFetch<AuthResponse>('/auth/register', { method: 'POST', body: input }),
@@ -131,6 +141,11 @@ export const authApi = {
       method: 'POST',
       body: { token, newPassword },
     }),
+
+  sessions: () => apiFetch<SessionInfo[]>('/auth/sessions', { auth: true }),
+
+  revokeSession: (id: string) =>
+    apiFetch<void>(`/auth/sessions/${id}`, { method: 'DELETE', auth: true }),
 };
 
 export const oauthUrls = {

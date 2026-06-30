@@ -15,17 +15,18 @@ import { MailService } from '@/modules/mail/mail.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { UsersService } from '@/modules/users/users.service';
 
-import { AuthTokens, AuthUser, OAuthProfile } from './auth.types';
+import {
+  AuthTokens,
+  AuthUser,
+  OAuthProfile,
+  RequestMetadata,
+  SessionInfo,
+} from './auth.types';
 import { OAUTH_ERROR_CODES, OAuthException } from './oauth-errors';
 import { TokenService } from './token.service';
 
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1h
-
-interface RequestMetadata {
-  userAgent?: string;
-  ipAddress?: string;
-}
 
 interface AuthResult {
   user: AuthUser;
@@ -147,6 +148,17 @@ export class AuthService implements OnModuleInit {
 
   async logoutAll(userId: string): Promise<void> {
     await this.tokens.revokeAllForUser(userId);
+  }
+
+  listSessions(
+    userId: string,
+    presentedRefreshToken?: string,
+  ): Promise<SessionInfo[]> {
+    return this.tokens.listActiveSessions(userId, presentedRefreshToken);
+  }
+
+  revokeSession(userId: string, sessionId: string): Promise<void> {
+    return this.tokens.revokeSessionById(userId, sessionId);
   }
 
   // Idempotent via provider/providerAccountId unique key.

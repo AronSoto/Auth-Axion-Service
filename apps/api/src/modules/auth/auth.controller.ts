@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   Query,
   Req,
@@ -29,7 +31,12 @@ import { THROTTLE } from '@/common/throttle';
 import { AppConfigService } from '@/config/app-config.service';
 
 import { AuthService } from './auth.service';
-import type { AuthUser, OAuthProfile } from './auth.types';
+import type {
+  AuthUser,
+  OAuthProfile,
+  RequestMetadata,
+  SessionInfo,
+} from './auth.types';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -80,7 +87,7 @@ export class AuthController {
     res.clearCookie(REFRESH_COOKIE, this.refreshCookieAttrs);
   }
 
-  private metadata(req: Request): { userAgent?: string; ipAddress?: string } {
+  private metadata(req: Request): RequestMetadata {
     return { userAgent: req.headers['user-agent'], ipAddress: req.ip };
   }
 
@@ -180,6 +187,30 @@ export class AuthController {
   ): Promise<void> {
     await this.auth.logoutAll(userId);
     this.clearRefreshCookie(res);
+  }
+
+  // Active sessions / devices
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('sessions')
+  @ApiOperation({ summary: 'List the active sessions for the current user' })
+  sessions(
+    @CurrentUser('id') userId: string,
+    @Req() req: Request,
+  ): Promise<SessionInfo[]> {
+    return this.auth.listSessions(userId, this.getRefreshTokenFromCookies(req));
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Delete('sessions/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Revoke a single session (sign out one device)' })
+  async revokeSession(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.auth.revokeSession(userId, id);
   }
 
   // Email verification

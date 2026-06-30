@@ -5,6 +5,7 @@ import gsap from 'gsap';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
+import { ActiveDevices } from '@/components/active-devices';
 import { Logo } from '@/components/logo';
 import { Button, Card } from '@/components/ui';
 import { swaggerUrl } from '@/lib/api';
@@ -101,6 +102,8 @@ export default function DashboardPage() {
             </div>
           </dl>
         </Card>
+
+        <ActiveDevices />
 
         <div className="mt-6 grid gap-4 text-xs text-muted sm:grid-cols-2">
           <a

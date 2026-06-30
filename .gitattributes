@@ -1,0 +1,15 @@
+# Prevents CRLF/LF churn between Windows and other platforms.
+* text=auto eol=lf
+
+# Binary assets — never normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+
+# Lockfiles — let Git treat as text but keep diffs quiet.
+pnpm-lock.yaml linguist-generated=true

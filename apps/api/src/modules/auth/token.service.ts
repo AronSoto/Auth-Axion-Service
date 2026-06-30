@@ -1,14 +1,25 @@
 import { randomBytes, createHash } from 'crypto';
 
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import ms, { type StringValue } from 'ms';
+import ms from 'ms';
 import { VerificationTokenType } from '@prisma/client';
+import { UAParser } from 'ua-parser-js';
 
 import { AppConfigService } from '@/config/app-config.service';
 import { PrismaService } from '@/prisma/prisma.service';
 
-import { AuthTokens, AuthUser, JwtAccessPayload } from './auth.types';
+import {
+  AuthTokens,
+  AuthUser,
+  JwtAccessPayload,
+  RequestMetadata,
+  SessionInfo,
+} from './auth.types';
 
 const REFRESH_TOKEN_BYTES = 48;
 const VERIFICATION_TOKEN_BYTES = 32;
@@ -51,12 +62,12 @@ export class TokenService {
   // Refresh token
   async issueRefreshToken(
     userId: string,
-    metadata?: { userAgent?: string; ipAddress?: string },
+    metadata?: RequestMetadata,
   ): Promise<{ token: string; expiresAt: Date }> {
     const token = this.generateOpaqueToken(REFRESH_TOKEN_BYTES);
     const tokenHash = this.hashToken(token);
     const expiresAt = new Date(
-      Date.now() + ms(this.config.jwt.refreshExpiresIn as StringValue),
+      Date.now() + ms(this.config.jwt.refreshExpiresIn),
     );
 
     await this.prisma.refreshToken.create({
@@ -81,7 +92,7 @@ export class TokenService {
    */
   async rotateRefreshToken(
     presentedToken: string,
-    metadata?: { userAgent?: string; ipAddress?: string },
+    metadata?: RequestMetadata,
   ): Promise<{ userId: string; newToken: string; expiresAt: Date }> {
     const tokenHash = this.hashToken(presentedToken);
     const existing = await this.prisma.refreshToken.findUnique({
@@ -105,7 +116,7 @@ export class TokenService {
     const newPlain = this.generateOpaqueToken(REFRESH_TOKEN_BYTES);
     const newHash = this.hashToken(newPlain);
     const newExpiresAt = new Date(
-      Date.now() + ms(this.config.jwt.refreshExpiresIn as StringValue),
+      Date.now() + ms(this.config.jwt.refreshExpiresIn),
     );
 
     // Atomic rotation: revoke old + insert new in a single transaction.
@@ -151,9 +162,54 @@ export class TokenService {
     });
   }
 
+  // Sessions ("manage active devices")
+  async listActiveSessions(
+    userId: string,
+    presentedRefreshToken?: string,
+  ): Promise<SessionInfo[]> {
+    const currentHash = presentedRefreshToken
+      ? this.hashToken(presentedRefreshToken)
+      : undefined;
+
+    const rows = await this.prisma.refreshToken.findMany({
+      where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        tokenHash: true,
+        userAgent: true,
+        ipAddress: true,
+        createdAt: true,
+        expiresAt: true,
+      },
+    });
+
+    return rows.map((row) => {
+      const ua = row.userAgent ? UAParser(row.userAgent) : undefined;
+      return {
+        id: row.id,
+        browser: ua?.browser.name ?? null,
+        os: ua?.os.name ?? null,
+        ipAddress: row.ipAddress,
+        createdAt: row.createdAt,
+        expiresAt: row.expiresAt,
+        current: currentHash !== undefined && row.tokenHash === currentHash,
+      };
+    });
+  }
+
+  // updateMany scoped by userId — never reveals another user's session ids.
+  async revokeSessionById(userId: string, sessionId: string): Promise<void> {
+    const { count } = await this.prisma.refreshToken.updateMany({
+      where: { id: sessionId, userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    if (count === 0) throw new NotFoundException('Session not found');
+  }
+
   async issueTokensForUser(
     user: AuthUser,
-    metadata?: { userAgent?: string; ipAddress?: string },
+    metadata?: RequestMetadata,
   ): Promise<AuthTokens> {
     const accessToken = this.signAccessToken(user);
     const refresh = await this.issueRefreshToken(user.id, metadata);

@@ -1,7 +1,6 @@
 import { Module, type Provider } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import type ms from 'ms';
 
 import { AppConfigModule } from '@/config/app-config.module';
 import { AppConfigService } from '@/config/app-config.service';
@@ -35,7 +34,7 @@ const oauthStrategies: Provider[] = [
       useFactory: (config: AppConfigService) => ({
         secret: config.jwt.accessSecret,
         signOptions: {
-          expiresIn: config.jwt.accessExpiresIn as ms.StringValue,
+          expiresIn: config.jwt.accessExpiresIn,
         },
       }),
     }),

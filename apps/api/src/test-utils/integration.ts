@@ -1,7 +1,6 @@
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { Test, type TestingModule } from '@nestjs/testing';
-import type ms from 'ms';
 
 import { AppConfigModule } from '@/config/app-config.module';
 import { AppConfigService } from '@/config/app-config.service';
@@ -46,7 +45,7 @@ export async function buildIntegrationModule(
         useFactory: (config: AppConfigService) => ({
           secret: config.jwt.accessSecret,
           signOptions: {
-            expiresIn: config.jwt.accessExpiresIn as ms.StringValue,
+            expiresIn: config.jwt.accessExpiresIn,
           },
         }),
       }),

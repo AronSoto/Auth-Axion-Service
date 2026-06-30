@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { StringValue } from 'ms';
 
 import { Env } from './env.validation';
 import { isGithubOAuthConfigured, isGoogleOAuthConfigured } from './oauth-env';
@@ -44,13 +45,13 @@ export class AppConfigService {
 
   get jwt(): {
     accessSecret: string;
-    accessExpiresIn: string;
-    refreshExpiresIn: string;
+    accessExpiresIn: StringValue;
+    refreshExpiresIn: StringValue;
   } {
     return {
       accessSecret: this.get('JWT_ACCESS_SECRET'),
-      accessExpiresIn: this.get('JWT_ACCESS_EXPIRES_IN'),
-      refreshExpiresIn: this.get('JWT_REFRESH_EXPIRES_IN'),
+      accessExpiresIn: this.get('JWT_ACCESS_EXPIRES_IN') as StringValue,
+      refreshExpiresIn: this.get('JWT_REFRESH_EXPIRES_IN') as StringValue,
     };
   }
 
