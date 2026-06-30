@@ -129,26 +129,3 @@ body {
     animation-duration: 0.001ms;
   }
 }
-
-/* Staggered reveal — children get sequential 60ms delays */
-.stagger > * {
-  animation: fade-up 0.5s ease-out both;
-}
-.stagger > *:nth-child(1) {
-  animation-delay: 0ms;
-}
-.stagger > *:nth-child(2) {
-  animation-delay: 60ms;
-}
-.stagger > *:nth-child(3) {
-  animation-delay: 120ms;
-}
-.stagger > *:nth-child(4) {
-  animation-delay: 180ms;
-}
-.stagger > *:nth-child(5) {
-  animation-delay: 240ms;
-}
-.stagger > *:nth-child(6) {
-  animation-delay: 300ms;
-}

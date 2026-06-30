@@ -1,13 +1,9 @@
 import { ExecutionContext, createParamDecorator } from '@nestjs/common';
 import { Request } from 'express';
 
-import { UserRole } from '@prisma/client';
+import type { AuthUser } from '@/modules/auth/auth.types';
 
-export interface AuthUser {
-  id: string;
-  email: string;
-  role: UserRole;
-}
+export type { AuthUser };
 
 /**
  * Resolves the authenticated user from the request, populated by JwtStrategy.validate().

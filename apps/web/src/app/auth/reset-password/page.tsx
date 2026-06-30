@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState, type FormEvent } from 'react';
 
+import { Logo } from '@/components/logo';
 import { Button, Card, Input } from '@/components/ui';
 import { ApiError, authApi } from '@/lib/api';
 import { usePageEntry } from '@/lib/use-page-entry';
@@ -69,8 +70,7 @@ function ResetPasswordContent() {
   return (
     <Card className="entry-card w-full max-w-md">
       <div className="mb-6 flex items-center gap-2.5">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/favicon.ico" alt="Axion" className="h-8 w-8" />
+        <Logo />
         <h1 className="text-base font-semibold">Set a new password</h1>
       </div>
 

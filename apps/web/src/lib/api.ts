@@ -89,6 +89,16 @@ export interface AuthUser {
   role: 'USER' | 'ADMIN';
 }
 
+// Returned by GET /users/me — the full profile, not just the session shape.
+export interface UserProfile extends AuthUser {
+  name: string | null;
+  avatarUrl: string | null;
+  emailVerifiedAt: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AuthResponse {
   user: AuthUser;
   accessToken: string;
@@ -105,7 +115,7 @@ export const authApi = {
 
   logout: () => apiFetch<void>('/auth/logout', { method: 'POST' }),
 
-  me: () => apiFetch<AuthUser>('/auth/me', { auth: true }),
+  me: () => apiFetch<UserProfile>('/users/me', { auth: true }),
 
   forgotPassword: (email: string) =>
     apiFetch<{ ok: true }>('/auth/forgot-password', { method: 'POST', body: { email } }),
@@ -127,3 +137,5 @@ export const oauthUrls = {
   google: `${API_URL}/auth/google`,
   github: `${API_URL}/auth/github`,
 };
+
+export const swaggerUrl = `${API_URL}/docs`;

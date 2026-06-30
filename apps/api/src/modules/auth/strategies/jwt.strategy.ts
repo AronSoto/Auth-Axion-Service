@@ -5,7 +5,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AppConfigService } from '@/config/app-config.service';
 import { UsersService } from '@/modules/users/users.service';
 
-import { AuthenticatedUser, JwtAccessPayload } from '../auth.types';
+import { AuthUser, JwtAccessPayload } from '../auth.types';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -20,7 +20,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  async validate(payload: JwtAccessPayload): Promise<AuthenticatedUser> {
+  async validate(payload: JwtAccessPayload): Promise<AuthUser> {
     if (payload.type !== 'access')
       throw new UnauthorizedException('Wrong token type');
     const user = await this.users.findById(payload.sub);

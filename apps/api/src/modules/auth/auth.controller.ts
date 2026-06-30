@@ -23,14 +23,13 @@ import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
-import type { AuthUser } from '@/common/decorators/current-user.decorator';
 import { Public } from '@/common/decorators/public.decorator';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { THROTTLE } from '@/common/throttle';
 import { AppConfigService } from '@/config/app-config.service';
 
 import { AuthService } from './auth.service';
-import type { AuthenticatedUser, OAuthProfile } from './auth.types';
+import type { AuthUser, OAuthProfile } from './auth.types';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -46,7 +45,7 @@ const REFRESH_COOKIE = 'refresh_token';
 const REFRESH_COOKIE_PATH = '/api/auth';
 
 interface AuthResponseBody {
-  user: AuthenticatedUser;
+  user: AuthUser;
   accessToken: string;
 }
 
@@ -281,14 +280,5 @@ export class AuthController {
       result.tokens.refreshTokenExpiresAt,
     );
     res.redirect(`${this.config.frontendUrl}/auth/oauth-callback`);
-  }
-
-  // Session info
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @Get('me')
-  @ApiOperation({ summary: 'Get the current authenticated user' })
-  me(@CurrentUser() user: AuthUser): AuthUser {
-    return user;
   }
 }

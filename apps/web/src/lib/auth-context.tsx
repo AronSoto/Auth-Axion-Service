@@ -10,24 +10,27 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-
 import { SessionExpiredOverlay } from '@/components/session-expired-overlay';
+import { ApiError, UserProfile, authApi, registerAuthBridge } from './api';
 
-import { ApiError, AuthUser, authApi, registerAuthBridge } from './api';
+export type SessionEndReason = 'expired' | 'signedOut';
 
 interface AuthContextValue {
-  user: AuthUser | null;
+  user: UserProfile | null;
   accessToken: string | null;
   isLoading: boolean;
   // True only after the initial silent-refresh attempt has finished.
   isReady: boolean;
-  // True when a previously-active session was just invalidated (refresh failed).
-  sessionExpired: boolean;
-  dismissSessionExpired: () => void;
+  // Non-null when a previously-active session was just invalidated. The
+  // overlay reads `reason` to pick the right copy.
+  sessionEndedReason: SessionEndReason | null;
+  dismissSessionEnded: () => void;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
-  refresh: () => Promise<string | null>;
+  // Refresh the access token AND load the full profile. Used by the OAuth
+  // callback page, which only has a refresh cookie when it lands.
+  hydrate: () => Promise<UserProfile | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -55,13 +58,13 @@ const hadSession = (): boolean => {
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionExpired, setSessionExpired] = useState(false);
+  const [sessionEndedReason, setSessionEndedReason] = useState<SessionEndReason | null>(null);
 
-  const dismissSessionExpired = useCallback(() => setSessionExpired(false), []);
+  const dismissSessionEnded = useCallback(() => setSessionEndedReason(null), []);
 
   // Prevents double-fire under React strict-mode.
   const didInit = useRef(false);
@@ -93,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (err instanceof ApiError && err.status === 401) {
           // Overlay only if this tab actually had a session before.
           if (accessTokenRef.current !== null || hadSession()) {
-            setSessionExpired(true);
+            setSessionEndedReason('expired');
           }
           clearSessionMark();
           setUser(null);
@@ -110,6 +113,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return promise;
   }, []);
 
+  const hydrate = useCallback(async (): Promise<UserProfile | null> => {
+    const token = await refresh();
+    if (!token) return null;
+    try {
+      const profile = await authApi.me();
+      setUser(profile);
+      markSession();
+      return profile;
+    } catch {
+      // /me failed after a successful refresh — drop silently.
+      clearLocalSession();
+      return null;
+    }
+  }, [refresh, clearLocalSession]);
+
   useEffect(() => {
     registerAuthBridge({
       getAccessToken: () => accessTokenRef.current,
@@ -125,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     bc.onmessage = (e: MessageEvent<AuthBroadcast>) => {
       if (e.data?.type !== 'logout') return;
       if (accessTokenRef.current !== null || hadSession()) {
-        setSessionExpired(true);
+        setSessionEndedReason('signedOut');
       }
       clearLocalSession();
     };
@@ -140,57 +158,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (didInit.current) return;
     didInit.current = true;
     void (async () => {
-      const token = await refresh();
-      if (token) {
-        try {
-          const me = await authApi.me();
-          setUser(me);
-          markSession();
-        } catch {
-          // /me failed after a successful refresh — drop silently.
-          setUser(null);
-          setAccessToken(null);
-          accessTokenRef.current = null;
-        }
-      }
+      await hydrate();
       setIsReady(true);
     })();
-  }, [refresh]);
+  }, [hydrate]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      const result = await authApi.login({ email, password });
-      setUser(result.user);
-      setAccessToken(result.accessToken);
-      accessTokenRef.current = result.accessToken;
+  // After login/register the API returns a session-shaped user. We still call
+  // /users/me to load the full profile (name, avatarUrl, timestamps).
+  const completeSession = useCallback(
+    async (accessToken: string): Promise<void> => {
+      setAccessToken(accessToken);
+      accessTokenRef.current = accessToken;
       markSession();
-      setSessionExpired(false);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      setSessionEndedReason(null);
+      try {
+        const profile = await authApi.me();
+        setUser(profile);
+      } catch {
+        // If /me fails right after a successful auth response, drop silently —
+        // the next page will retry via hydrate().
+        clearLocalSession();
+      }
+    },
+    [clearLocalSession],
+  );
 
-  const register = useCallback(async (email: string, password: string, name?: string) => {
-    setIsLoading(true);
-    try {
-      const result = await authApi.register({ email, password, name });
-      setUser(result.user);
-      setAccessToken(result.accessToken);
-      accessTokenRef.current = result.accessToken;
-      markSession();
-      setSessionExpired(false);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      setIsLoading(true);
+      try {
+        const result = await authApi.login({ email, password });
+        await completeSession(result.accessToken);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [completeSession],
+  );
+
+  const register = useCallback(
+    async (email: string, password: string, name?: string) => {
+      setIsLoading(true);
+      try {
+        const result = await authApi.register({ email, password, name });
+        await completeSession(result.accessToken);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [completeSession],
+  );
 
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
     } finally {
       clearLocalSession();
-      setSessionExpired(false);
+      setSessionEndedReason(null);
       broadcastRef.current?.postMessage({ type: 'logout' } satisfies AuthBroadcast);
     }
   }, [clearLocalSession]);
@@ -201,31 +225,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accessToken,
       isLoading,
       isReady,
-      sessionExpired,
-      dismissSessionExpired,
+      sessionEndedReason,
+      dismissSessionEnded,
       login,
       register,
       logout,
-      refresh,
+      hydrate,
     }),
     [
       user,
       accessToken,
       isLoading,
       isReady,
-      sessionExpired,
-      dismissSessionExpired,
+      sessionEndedReason,
+      dismissSessionEnded,
       login,
       register,
       logout,
-      refresh,
+      hydrate,
     ],
   );
 
   return (
     <AuthContext.Provider value={value}>
       {children}
-      <SessionExpiredOverlay open={sessionExpired} onDismiss={dismissSessionExpired} />
+      <SessionExpiredOverlay reason={sessionEndedReason} onDismiss={dismissSessionEnded} />
     </AuthContext.Provider>
   );
 }

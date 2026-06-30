@@ -3,13 +3,29 @@
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import Link from 'next/link';
-import { useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useRef } from 'react';
 
+import { Logo } from '@/components/logo';
 import { LoginForm } from '@/components/login-form';
 import { Card } from '@/components/ui';
+import { swaggerUrl } from '@/lib/api';
 
-export default function LandingPage() {
+// Maps the `?error=...` codes from OAuthCallbackFilter to human-readable text.
+const ERROR_MESSAGES: Record<string, string> = {
+  oauth_failed: 'Sign-in failed. Please try again.',
+  oauth_unverified:
+    "We couldn't link your provider account because the email isn't verified at the provider.",
+  oauth_disabled: 'Your account is disabled. Contact support.',
+};
+
+function LandingPageContent() {
   const root = useRef<HTMLElement>(null);
+  const params = useSearchParams();
+  const errorCode = params.get('error');
+  const errorMessage = errorCode
+    ? (ERROR_MESSAGES[errorCode] ?? 'Something went wrong. Please try again.')
+    : null;
 
   useGSAP(
     () => {
@@ -27,7 +43,6 @@ export default function LandingPage() {
         .from('.login-card', { x: 32, opacity: 0, duration: 0.9, ease: 'back.out(1.4)' }, 0.35)
         .from('.login-caption', { y: 8, opacity: 0, duration: 0.5 }, '-=0.4');
 
-      // Subtle infinite pulse on the live-status dot
       gsap.to('.live-dot', {
         scale: 1.4,
         opacity: 0.6,
@@ -37,7 +52,6 @@ export default function LandingPage() {
         ease: 'sine.inOut',
       });
 
-      // Tiny ambient drift on the glow halo
       gsap.to('.glow', {
         x: 24,
         y: -12,
@@ -94,7 +108,7 @@ export default function LandingPage() {
 
           <div className="mt-10 flex items-center gap-3 text-xs text-muted">
             <a
-              href="http://localhost:3000/api/docs"
+              href={swaggerUrl}
               target="_blank"
               rel="noreferrer"
               className="hero-link underline hover:text-foreground"
@@ -117,10 +131,17 @@ export default function LandingPage() {
         <section className="login-card">
           <Card>
             <div className="mb-6 flex items-center gap-2.5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/favicon.ico" alt="Axion" className="h-8 w-8" />
+              <Logo />
               <h2 className="text-base font-semibold">Sign in to demo</h2>
             </div>
+            {errorMessage && (
+              <p
+                role="alert"
+                className="mb-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500"
+              >
+                {errorMessage}
+              </p>
+            )}
             <LoginForm />
           </Card>
           <p className="login-caption mt-4 text-center text-[11px] text-muted">
@@ -133,5 +154,14 @@ export default function LandingPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function LandingPage() {
+  // useSearchParams must be wrapped in Suspense in app router.
+  return (
+    <Suspense fallback={<main className="flex-1" aria-hidden="true" />}>
+      <LandingPageContent />
+    </Suspense>
   );
 }

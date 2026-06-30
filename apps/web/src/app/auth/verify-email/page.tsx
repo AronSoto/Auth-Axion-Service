@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 
+import { Logo } from '@/components/logo';
 import { Button, Card } from '@/components/ui';
 import { ApiError, authApi } from '@/lib/api';
 import { usePageEntry } from '@/lib/use-page-entry';
@@ -22,8 +23,12 @@ function VerifyEmailContent() {
 
   usePageEntry([status]);
 
+  //Single-use token, Strict Mode crash
+  const submitted = useRef(false);
+
   useEffect(() => {
-    if (!token) return;
+    if (!token || submitted.current) return;
+    submitted.current = true;
     void authApi.verifyEmail(token).then(
       () => setStatus('success'),
       (err: unknown) => {
@@ -36,8 +41,7 @@ function VerifyEmailContent() {
   return (
     <Card className="entry-card w-full max-w-md">
       <div className="mb-6 flex items-center gap-2.5">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/favicon.ico" alt="Axion" className="h-8 w-8" />
+        <Logo />
         <h1 className="text-base font-semibold">Email verification</h1>
       </div>
 

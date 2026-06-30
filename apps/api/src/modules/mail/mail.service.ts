@@ -24,7 +24,7 @@ export class MailService implements OnModuleInit {
     if (driver === 'smtp') {
       if (!smtp.host || !smtp.port) {
         this.logger.warn(
-          'MAIL_DRIVER=smtp but Mailtrap creds missing — emails will be logged only.',
+          'MAIL_DRIVER=smtp but SMTP creds missing — emails will be logged only.',
         );
         return;
       }

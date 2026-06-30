@@ -3,7 +3,14 @@ import type { Response } from 'express';
 
 import { AppConfigService } from '@/config/app-config.service';
 
-// Translates OAuth-callback failures into a frontend redirect.
+import {
+  OAUTH_ERROR_CODES,
+  OAuthException,
+  type OAuthErrorCode,
+} from '../oauth-errors';
+
+// Translates OAuth-callback failures (passport guard OR controller body)
+// into a frontend redirect so users never see raw JSON.
 @Catch()
 export class OAuthCallbackFilter implements ExceptionFilter {
   private readonly logger = new Logger(OAuthCallbackFilter.name);
@@ -14,8 +21,14 @@ export class OAuthCallbackFilter implements ExceptionFilter {
     const res = host.switchToHttp().getResponse<Response>();
     const message = exception instanceof Error ? exception.message : 'unknown';
     this.logger.warn(`OAuth callback failed: ${message}`);
+
+    const code: OAuthErrorCode =
+      exception instanceof OAuthException
+        ? exception.code
+        : OAUTH_ERROR_CODES.failed;
+
     res.redirect(
-      `${this.config.frontendUrl}/auth/oauth-callback?error=oauth_failed`,
+      `${this.config.frontendUrl}/auth/oauth-callback?error=${code}`,
     );
   }
 }

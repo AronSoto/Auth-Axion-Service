@@ -1,9 +1,13 @@
-import { AuthProvider, User } from '@prisma/client';
+import { AuthProvider, UserRole } from '@prisma/client';
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  role: UserRole;
+}
 
 export interface JwtAccessPayload {
   sub: string;
-  email: string;
-  role: string;
   type: 'access';
 }
 
@@ -23,5 +27,3 @@ export interface OAuthProfile {
   accessToken?: string;
   refreshToken?: string;
 }
-
-export type AuthenticatedUser = Pick<User, 'id' | 'email' | 'role'>;

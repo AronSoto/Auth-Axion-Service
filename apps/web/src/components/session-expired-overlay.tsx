@@ -3,20 +3,39 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-interface Props {
-  open: boolean;
+import type { SessionEndReason } from '@/lib/auth-context';
+
+interface OverlayProps {
+  reason: SessionEndReason;
   onDismiss: () => void;
   autoRedirectMs?: number;
   redirectTo?: string;
 }
 
-export function SessionExpiredOverlay(props: Props) {
-  // Remount fresh on each open so state initialisers stay declarative.
-  if (!props.open) return null;
-  return <OverlayBody {...props} />;
+interface Props extends Omit<OverlayProps, 'reason'> {
+  reason: SessionEndReason | null;
 }
 
-function OverlayBody({ onDismiss, autoRedirectMs = 6000, redirectTo = '/' }: Props) {
+const COPY: Record<SessionEndReason, { title: string; body: string; ctaLabel: string }> = {
+  expired: {
+    title: 'Your session expired',
+    body: 'For your security, you were signed out after a period of inactivity. Sign back in to pick up where you left off.',
+    ctaLabel: 'Back to home',
+  },
+  signedOut: {
+    title: 'You signed out in another tab',
+    body: 'This tab no longer has an active session. Sign back in to continue using Auth Axion.',
+    ctaLabel: 'Back to home',
+  },
+};
+
+export function SessionExpiredOverlay({ reason, ...rest }: Props) {
+  // Remount fresh on each open so state initialisers stay declarative.
+  if (!reason) return null;
+  return <OverlayBody reason={reason} {...rest} />;
+}
+
+function OverlayBody({ reason, onDismiss, autoRedirectMs = 6000, redirectTo = '/' }: OverlayProps) {
   const router = useRouter();
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [endTime] = useState(() => Date.now() + autoRedirectMs);
@@ -46,6 +65,7 @@ function OverlayBody({ onDismiss, autoRedirectMs = 6000, redirectTo = '/' }: Pro
   }, [autoRedirectMs, redirectTo, onDismiss, router]);
 
   const secondsLeft = Math.max(0, Math.ceil((endTime - now) / 1000));
+  const copy = COPY[reason];
 
   const close = () => {
     onDismiss();
@@ -56,8 +76,8 @@ function OverlayBody({ onDismiss, autoRedirectMs = 6000, redirectTo = '/' }: Pro
     <div
       role="alertdialog"
       aria-modal="true"
-      aria-labelledby="session-expired-title"
-      aria-describedby="session-expired-desc"
+      aria-labelledby="session-ended-title"
+      aria-describedby="session-ended-desc"
       className="fixed inset-0 z-50 flex items-center justify-center px-4 animate-overlay-in"
     >
       <div className="absolute inset-0 bg-background/70 backdrop-blur-xl" onClick={close} />
@@ -90,16 +110,12 @@ function OverlayBody({ onDismiss, autoRedirectMs = 6000, redirectTo = '/' }: Pro
           </svg>
         </div>
 
-        <h2 id="session-expired-title" className="mt-6 text-2xl font-semibold tracking-tight">
-          Your session expired
+        <h2 id="session-ended-title" className="mt-6 text-2xl font-semibold tracking-tight">
+          {copy.title}
         </h2>
 
-        <p
-          id="session-expired-desc"
-          className="mt-2 max-w-[42ch] text-sm leading-relaxed text-muted"
-        >
-          For your security, you were signed out after a period of inactivity. Sign back in to pick
-          up where you left off.
+        <p id="session-ended-desc" className="mt-2 max-w-[42ch] text-sm leading-relaxed text-muted">
+          {copy.body}
         </p>
 
         <div
@@ -122,7 +138,7 @@ function OverlayBody({ onDismiss, autoRedirectMs = 6000, redirectTo = '/' }: Pro
                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
                        active:translate-y-px"
           >
-            Back to home
+            {copy.ctaLabel}
             <svg
               viewBox="0 0 24 24"
               fill="none"
