@@ -23,7 +23,33 @@
 
 **Auth Axion** is a portfolio project: a standalone authentication backend that any frontend can consume. It was built to demonstrate clean **NestJS architecture** — feature-organised modules, dependency injection, guards, decorators, exception filters — rather than to be the smallest possible auth implementation.
 
-Every concern (token rotation, OAuth account linking, email delivery, RBAC) lives in its own well-named file. The companion Next.js frontend is intentionally minimal — just enough to demo every backend flow end-to-end (see the [product tour](#-product-tour) below).
+Every concern (token rotation, OAuth account linking, email delivery, RBAC) lives in its own well-named file. The companion Next.js frontend is intentionally minimal — just enough to demo every backend flow end-to-end.
+
+<p align="center">
+  <img src="docs/screenshots/landing.png" alt="Landing & sign in" width="880" />
+</p>
+
+<p align="center"><b>Landing &amp; sign in.</b> Split hero over an animated constellation. Email + password or one-click Google / GitHub OAuth — on success the API issues a short-lived access token plus an <code>httpOnly</code> refresh cookie.</p>
+
+<br />
+
+<img src="docs/screenshots/register.png" alt="Create account" align="right" width="45%" />
+
+**Create account.** Registration runs a live password policy — zxcvbn strength scoring plus a HaveIBeenPwned breach check reject weak or leaked passwords _before_ the account is created. A verification email is then sent to confirm ownership.
+
+<br clear="all" />
+
+<img src="docs/screenshots/forgot-password.png" alt="Password reset" align="left" width="45%" />
+
+**Password reset.** Enter your email for a single-use reset link. The response is always identical, so it never reveals whether an account exists — and completing a reset revokes every active session as a precaution.
+
+<br clear="all" />
+
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" alt="Dashboard" width="880" />
+</p>
+
+<p align="center"><b>Dashboard.</b> Identity, role &amp; verification badges, a copy-able user id, and active-device management — list every signed-in session and revoke any of them.</p>
 
 ---
 
@@ -81,47 +107,6 @@ Every concern (token rotation, OAuth account linking, email delivery, RBAC) live
 - **Coalesced silent refresh** — concurrent 401s share one `/auth/refresh` call
 - **Session-expired overlay** — graceful full-screen takeover instead of an abrupt redirect
 - **Cross-tab logout sync** via `BroadcastChannel`
-
----
-
-## 📸 Product tour
-
-A quick walk through the demo frontend and the backend flow behind each screen.
-
-<table>
-  <tr>
-    <td width="58%"><img src="docs/screenshots/landing.png" alt="Landing and sign in" /></td>
-    <td width="42%" valign="top">
-      <h3>Landing &amp; sign in</h3>
-      <p>Split hero over an animated constellation backdrop. Sign in with email + password, or one-click <strong>Google / GitHub OAuth</strong>.</p>
-      <p><sub>On success the API issues a short-lived access token plus an <code>httpOnly</code> refresh cookie, and the client lands on the dashboard.</sub></p>
-    </td>
-  </tr>
-  <tr>
-    <td width="42%" valign="top">
-      <h3>Create account</h3>
-      <p>Registration with a <strong>live password policy</strong>: zxcvbn strength scoring and a HaveIBeenPwned breach check reject weak or leaked passwords before the account is created.</p>
-      <p><sub>A verification email is sent; local login can be gated on it via <code>REQUIRE_EMAIL_VERIFICATION</code>.</sub></p>
-    </td>
-    <td width="58%"><img src="docs/screenshots/register.png" alt="Create account" /></td>
-  </tr>
-  <tr>
-    <td width="58%"><img src="docs/screenshots/forgot-password.png" alt="Password reset" /></td>
-    <td width="42%" valign="top">
-      <h3>Password reset</h3>
-      <p>Enter your email to receive a <strong>single-use reset link</strong>. The response is always identical, so it never leaks whether an account exists.</p>
-      <p><sub>Completing a reset revokes every active session — a password change is treated as a compromise signal.</sub></p>
-    </td>
-  </tr>
-  <tr>
-    <td width="42%" valign="top">
-      <h3>Dashboard</h3>
-      <p>Identity, role &amp; email-verification badges, and a copy-able user id. Includes <strong>active-device management</strong>: every signed-in session is listed and can be revoked.</p>
-      <p><sub>"This device" is detected by matching the refresh-cookie hash; revoking a session invalidates its refresh token server-side.</sub></p>
-    </td>
-    <td width="58%"><img src="docs/screenshots/dashboard.png" alt="Dashboard" /></td>
-  </tr>
-</table>
 
 ---
 
