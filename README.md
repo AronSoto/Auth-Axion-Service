@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/Axion.png" alt="Auth Axion" width="400" />
+  <img src="docs/AuthAxion.png" alt="Auth Axion" width="400" />
 </p>
 
 <p align="center">
@@ -52,27 +52,39 @@ Every concern (token rotation, OAuth account linking, email delivery, RBAC) live
 
 ## ✨ Features
 
-- **JWT access tokens** (15 min) + **opaque refresh tokens** stored as SHA-256 hashes
-- **Refresh-token rotation** — old token revoked atomically, new one issued in a single transaction
-- **Reuse detection** — replaying a revoked token revokes the entire token chain for the user (compromise containment)
-- **Email + password** registration with **email verification**
-- **Configurable email-verification gate** — `REQUIRE_EMAIL_VERIFICATION=true` blocks local login until verified; OAuth bypasses it
-- **Password reset** flow — invalidates every active session on completion
-- **OAuth** with Google + GitHub, with **account linking by email** (idempotent upsert; profile fields preserved on re-login)
-- **Role-based access control** via guards + decorators (`@Roles('admin')`)
-- **Rate limiting** via `@nestjs/throttler` (configurable TTL + limit)
-- **Swagger / OpenAPI** auto-generated docs
-- **httpOnly + Secure + SameSite** refresh cookie, scoped to `/api/auth`
-- **No info leak** — `forgot-password` / `resend-verification` always return 200
-- **Coalesced silent refresh** on the web client — concurrent 401s share one `/auth/refresh` call, preventing self-inflicted reuse detection
-- **Session-expired overlay** — when refresh fails on a tab that had a session, a graceful full-screen message takes over instead of an abrupt redirect
-- **Cross-tab logout sync** via `BroadcastChannel` — logging out in one tab surfaces the expired overlay in every other open tab
-- **Active device / session management** — list every signed-in session and revoke one or all (`GET` / `DELETE /auth/sessions`), with "this device" detection by refresh-cookie hash
-- **Security audit log** — every auth event (login success/failure, OAuth, reset, token-reuse, lockout, session revocation) is recorded to a `SecurityEvent` table; admins read recent events via `/admin/security-events`
-- **Account lockout** — 5 failed local logins temporarily locks the account (15 min), on top of IP-based rate limiting
-- **Password strength + breach check** — zxcvbn strength scoring plus a HaveIBeenPwned k-anonymity lookup on register / reset (fails open if HIBP is unreachable)
-- **OAuth CSRF protection** — a one-time `state` cookie is issued on start and verified on the provider callback
-- **Structured logging** — pino JSON logs with a per-request id, redacting credentials and cookies
+#### 🔐 Tokens & sessions
+
+- **JWT access** (15 min) + **opaque refresh tokens** stored as SHA-256 hashes
+- **Rotation** — old token revoked and a new one issued in a single transaction
+- **Reuse detection** — replaying a revoked token burns the whole chain (compromise containment)
+- **Device management** — list & revoke sessions (`GET`/`DELETE /auth/sessions`), with "this device" detection
+
+#### 🛡️ Account security
+
+- **Account lockout** — 5 failed logins → 15-min temporary lock, on top of IP rate limiting
+- **Password strength + breach** — zxcvbn scoring + HaveIBeenPwned lookup (k-anonymity, fails open)
+- **OAuth CSRF** — one-time `state` cookie verified on the provider callback
+- **Timing-safe login** — dummy-hash verify + silent flows: no user enumeration
+- **Hardened cookie** — refresh token is `httpOnly + Secure + SameSite`, scoped to `/api/auth`
+
+#### 🔑 Auth flows
+
+- **Email + password** registration with **email verification** (configurable gate)
+- **Password reset** — invalidates every active session on completion
+- **OAuth** (Google + GitHub) with **account linking by email** (idempotent; profile preserved)
+- **RBAC** via guards + decorators (`@Roles('admin')`) and per-route rate limits
+
+#### 📊 Observability & ops
+
+- **Security audit log** — auth events recorded to `SecurityEvent`; admins read via `/admin/security-events`
+- **Structured logging** — pino JSON logs with a per-request id, credentials redacted
+- **Swagger / OpenAPI** auto-generated docs at `/api/docs`
+
+#### 💻 Frontend UX
+
+- **Coalesced silent refresh** — concurrent 401s share one `/auth/refresh` call
+- **Session-expired overlay** — graceful full-screen takeover instead of an abrupt redirect
+- **Cross-tab logout sync** via `BroadcastChannel`
 
 ---
 
