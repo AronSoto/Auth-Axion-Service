@@ -88,6 +88,16 @@ Every concern (token rotation, OAuth account linking, email delivery, RBAC) live
 
 ---
 
+## 📸 Screenshots
+
+|                         Landing                         |                  Create account                  |
+| :-----------------------------------------------------: | :----------------------------------------------: |
+|        ![Landing](docs/screenshots/landing.png)         | ![Create account](docs/screenshots/register.png) |
+|                   **Password reset**                    |                  **Dashboard**                   |
+| ![Password reset](docs/screenshots/forgot-password.png) |   ![Dashboard](docs/screenshots/dashboard.png)   |
+
+---
+
 ## 🚀 Quick start
 
 ```bash
@@ -278,7 +288,7 @@ To send real emails in prod you also need to **verify a domain** in Resend (DNS 
 │           │   └── shared/   By concern (background, motion, auth, dashboard, feedback)
 │           ├── hooks/        Reusable hooks (use-page-entry)
 │           └── lib/          API client + auth context
-├── docs/                     README assets (logo)
+├── docs/                     README assets (logo, gif, screenshots/)
 ├── docker-compose.yml        Postgres 16-alpine container
 ├── .env.example              Documented env-var template
 ├── pnpm-workspace.yaml
