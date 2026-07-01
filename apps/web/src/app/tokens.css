@@ -1,0 +1,64 @@
+:root {
+  /* Surfaces */
+  --background: #0b0a09; /* warm near-black (never #000) */
+  --card: #16130f; /* default surface */
+  --surface-2: #1e1a15; /* elevated / hover surface */
+  --border: #2a251e;
+  --border-strong: #3a332a;
+
+  /* Text */
+  --foreground: #f5f3f0;
+  --muted: #938c82;
+
+  /* Accent — amber (the single accent color) */
+  --primary: #f59e0b;
+  --primary-hover: #fbbf24;
+  --primary-foreground: #1a1206; /* dark ink on amber for contrast */
+  --ring: rgba(245, 158, 11, 0.4);
+
+  /* Semantic */
+  --danger: #f87171;
+  --danger-foreground: #1a0a0a;
+  --success: #34d399;
+
+  /* Radii */
+  --radius-sm: 0.5rem;
+  --radius: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+
+  /* Shadows — tinted toward the background, no colored glow */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 30px -12px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 24px 60px -30px rgba(0, 0, 0, 0.75);
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --background: #faf9f7; /* warm off-white */
+    --card: #ffffff;
+    --surface-2: #f4f2ee;
+    --border: #e7e3db;
+    --border-strong: #d8d2c7;
+
+    --foreground: #1c1917;
+    --muted: #78716c;
+
+    --primary: #d97706; /* amber-600 for AA contrast on light */
+    --primary-hover: #b45309;
+    --primary-foreground: #ffffff;
+    --ring: rgba(217, 119, 6, 0.35);
+
+    --danger: #dc2626;
+    --danger-foreground: #ffffff;
+    --success: #059669;
+
+    --shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.06);
+    --shadow-md: 0 8px 30px -12px rgba(24, 24, 27, 0.12);
+    --shadow-lg: 0 24px 60px -30px rgba(24, 24, 27, 0.25);
+
+    color-scheme: light;
+  }
+}

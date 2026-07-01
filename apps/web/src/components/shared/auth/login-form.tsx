@@ -1,14 +1,15 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-import Link from 'next/link';
-
+import { GithubIcon, GoogleIcon, HButton, HCallout, HInput } from '@/components/ui';
+import { Magnetic } from '@/components/shared/motion/magnetic';
 import { ApiError, oauthUrls } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
-import { GithubIcon, GoogleIcon } from './icons';
-import { Button, Input } from './ui';
+const oauthButtonClass =
+  'group flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface-2/60 px-3 py-2.5 text-sm font-medium transition-colors hover:border-border-strong hover:bg-surface-2';
 
 export function LoginForm() {
   const router = useRouter();
@@ -31,20 +32,18 @@ export function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3">
-        <a
-          href={oauthUrls.google}
-          className="group inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-sm font-medium hover:bg-border/30 transition-colors"
-        >
-          <GoogleIcon className="h-4 w-4 transition-transform duration-300 ease-out group-hover:scale-110 group-hover:rotate-6" />
-          Google
-        </a>
-        <a
-          href={oauthUrls.github}
-          className="group inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-sm font-medium hover:bg-border/30 transition-colors"
-        >
-          <GithubIcon className="h-4 w-4 transition-transform duration-300 ease-out group-hover:scale-110 group-hover:-rotate-6" />
-          GitHub
-        </a>
+        <Magnetic strength={0.25}>
+          <a href={oauthUrls.google} className={oauthButtonClass}>
+            <GoogleIcon className="h-4 w-4 transition-transform duration-300 ease-out group-hover:scale-110 group-hover:rotate-6" />
+            Google
+          </a>
+        </Magnetic>
+        <Magnetic strength={0.25}>
+          <a href={oauthUrls.github} className={oauthButtonClass}>
+            <GithubIcon className="h-4 w-4 transition-transform duration-300 ease-out group-hover:scale-110 group-hover:-rotate-6" />
+            GitHub
+          </a>
+        </Magnetic>
       </div>
 
       <div className="relative my-2">
@@ -56,7 +55,7 @@ export function LoginForm() {
         </div>
       </div>
 
-      <Input
+      <HInput
         label="Email"
         name="email"
         type="email"
@@ -68,7 +67,7 @@ export function LoginForm() {
       />
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <label htmlFor="password" className="text-xs font-medium text-foreground/80">
+          <label htmlFor="password" className="text-xs font-medium text-foreground/70">
             Password
           </label>
           <Link
@@ -78,7 +77,7 @@ export function LoginForm() {
             Forgot?
           </Link>
         </div>
-        <Input
+        <HInput
           name="password"
           id="password"
           type="password"
@@ -91,15 +90,11 @@ export function LoginForm() {
         />
       </div>
 
-      {error && (
-        <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500">
-          {error}
-        </p>
-      )}
+      {error && <HCallout tone="danger">{error}</HCallout>}
 
-      <Button type="submit" isLoading={isLoading} className="mt-2">
+      <HButton type="submit" isLoading={isLoading} className="mt-2">
         Sign in
-      </Button>
+      </HButton>
 
       <p className="text-center text-xs text-muted">
         Don&apos;t have an account?{' '}

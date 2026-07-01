@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-
 import type { SessionEndReason } from '@/lib/auth-context';
 
 interface OverlayProps {
@@ -84,7 +83,7 @@ function OverlayBody({ reason, onDismiss, autoRedirectMs = 6000, redirectTo = '/
 
       <div
         className="relative w-full max-w-md rounded-4xl border border-border bg-card p-10
-                   shadow-[0_20px_60px_-20px_rgba(0,0,0,0.18)]
+                   shadow-(--shadow-lg)
                    animate-panel-in"
       >
         <span

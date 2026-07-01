@@ -1,8 +1,8 @@
 'use client';
 
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
-
-import { Button, Card } from '@/components/ui';
+import { HButton, HCard } from '@/components/ui';
 import { ApiError, SessionInfo, authApi } from '@/lib/api';
 
 function deviceLabel(s: SessionInfo): string {
@@ -15,6 +15,12 @@ function formatDate(iso: string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
+}
+
+// ::1 / 127.0.0.1 are loopback (you, on this machine) — show something human.
+function formatIp(ip: string | null): string {
+  if (!ip || ip === '::1' || ip === '127.0.0.1') return 'Local';
+  return ip;
 }
 
 function DeviceIcon() {
@@ -70,14 +76,14 @@ export function ActiveDevices() {
   }
 
   return (
-    <Card className="dash-card mt-6">
+    <HCard className="dash-card mt-6">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold tracking-tight">Active devices</h2>
         <span className="text-xs text-muted">{sessions ? `${sessions.length} active` : ''}</span>
       </div>
       <p className="mt-1 text-xs text-muted">Sessions currently signed in to your account.</p>
 
-      {error && <p className="mt-4 text-xs text-red-500">{error}</p>}
+      {error && <p className="mt-4 text-xs text-danger">{error}</p>}
 
       {!sessions && !error && (
         <div className="mt-4 flex justify-center py-4">
@@ -87,36 +93,45 @@ export function ActiveDevices() {
 
       {sessions && (
         <ul className="mt-4 flex flex-col divide-y divide-border">
-          {sessions.map((s) => (
-            <li key={s.id} className="flex items-center gap-3 py-3">
-              <DeviceIcon />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium">{deviceLabel(s)}</span>
-                  {s.current && (
-                    <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                      This device
-                    </span>
-                  )}
+          <AnimatePresence initial={false}>
+            {sessions.map((s) => (
+              <motion.li
+                key={s.id}
+                layout
+                initial={false}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                className="flex items-center gap-3 py-3"
+              >
+                <DeviceIcon />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium">{deviceLabel(s)}</span>
+                    {s.current && (
+                      <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        This device
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-muted">
+                    {formatIp(s.ipAddress)} · Started {formatDate(s.createdAt)}
+                  </p>
                 </div>
-                <p className="mt-0.5 truncate text-xs text-muted">
-                  {s.ipAddress ?? 'Unknown IP'} · Started {formatDate(s.createdAt)}
-                </p>
-              </div>
-              {!s.current && (
-                <Button
-                  variant="secondary"
-                  className="px-3 py-1.5 text-xs"
-                  isLoading={revoking === s.id}
-                  onClick={() => handleRevoke(s.id)}
-                >
-                  Sign out
-                </Button>
-              )}
-            </li>
-          ))}
+                {!s.current && (
+                  <HButton
+                    variant="secondary"
+                    size="sm"
+                    isLoading={revoking === s.id}
+                    onClick={() => handleRevoke(s.id)}
+                  >
+                    Sign out
+                  </HButton>
+                )}
+              </motion.li>
+            ))}
+          </AnimatePresence>
         </ul>
       )}
-    </Card>
+    </HCard>
   );
 }

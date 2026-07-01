@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { SessionExpiredOverlay } from '@/components/session-expired-overlay';
+import { SessionExpiredOverlay } from '@/components/shared/feedback/session-expired-overlay';
 import { ApiError, UserProfile, authApi, registerAuthBridge } from './api';
 
 export type SessionEndReason = 'expired' | 'signedOut';

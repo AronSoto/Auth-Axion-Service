@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
+import { ConstellationBackground } from '@/components/shared/background/constellation-background';
 import { AuthProvider } from '@/lib/auth-context';
 
 const geistSans = Geist({
@@ -14,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Auth Axion — modern authentication, ready to consume',
+  title: 'Axion',
   description:
     'Standalone NestJS authentication service: JWT, refresh rotation, OAuth (Google, GitHub), email verification, password reset.',
 };
@@ -27,6 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
+        <ConstellationBackground />
         <AuthProvider>{children}</AuthProvider>
         <footer className="relative z-10 border-t border-border bg-background/60 px-6 py-5 text-[11px] text-muted backdrop-blur">
           <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 sm:flex-row">
