@@ -3,12 +3,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-
-import { Logo } from '@/components/logo';
-import { Button, Card, Input } from '@/components/ui';
+import { HButton, HCallout, HCard, HInput, HText, Logo } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { usePageEntry } from '@/lib/use-page-entry';
+import { usePageEntry } from '@/hooks/use-page-entry';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -32,27 +30,26 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="relative flex flex-1 items-center justify-center overflow-hidden px-6 py-16">
-      <div className="absolute inset-0 bg-grid pointer-events-none" />
-      <div className="absolute top-0 left-1/2 h-100 w-160 -translate-x-1/2 glow pointer-events-none" />
-
-      <Card className="entry-card relative z-10 w-full max-w-md">
+    <main className="relative flex flex-1 items-center justify-center px-6 py-16">
+      <HCard className="entry-card relative z-10 w-full max-w-md">
         <div className="mb-7 flex items-center gap-2.5">
           <Logo />
-          <h1 className="text-base font-semibold">Create your account</h1>
+          <HText as="h1" variant="h2">
+            Create your account
+          </HText>
         </div>
 
         <form onSubmit={handleSubmit} className="entry-stagger flex flex-col gap-4">
-          <Input
+          <HInput
             label="Name (optional)"
             name="name"
             type="text"
             autoComplete="name"
-            placeholder="AronSoto"
+            placeholder="Aron Soto"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-          <Input
+          <HInput
             label="Email"
             name="email"
             type="email"
@@ -62,7 +59,7 @@ export default function RegisterPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-          <Input
+          <HInput
             label="Password"
             name="password"
             type="password"
@@ -74,15 +71,11 @@ export default function RegisterPage() {
             onChange={(e) => setPassword(e.target.value)}
           />
 
-          {error && (
-            <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500">
-              {error}
-            </p>
-          )}
+          {error && <HCallout tone="danger">{error}</HCallout>}
 
-          <Button type="submit" isLoading={isLoading} className="mt-1">
+          <HButton type="submit" isLoading={isLoading} className="mt-1">
             Create account
-          </Button>
+          </HButton>
         </form>
 
         <p className="mt-6 text-center text-xs text-muted">
@@ -91,7 +84,7 @@ export default function RegisterPage() {
             Sign in
           </Link>
         </p>
-      </Card>
+      </HCard>
     </main>
   );
 }

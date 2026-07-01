@@ -2,11 +2,9 @@
 
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
-
-import { Logo } from '@/components/logo';
-import { Button, Card, Input } from '@/components/ui';
+import { CheckIcon, HButton, HCallout, HCard, HInput, HText, Logo } from '@/components/ui';
 import { ApiError, authApi } from '@/lib/api';
-import { usePageEntry } from '@/lib/use-page-entry';
+import { usePageEntry } from '@/hooks/use-page-entry';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -31,14 +29,13 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="relative flex flex-1 items-center justify-center overflow-hidden px-6 py-16">
-      <div className="absolute inset-0 bg-grid pointer-events-none" />
-      <div className="absolute top-0 left-1/2 h-100 w-160 -translate-x-1/2 glow pointer-events-none" />
-
-      <Card className="entry-card relative z-10 w-full max-w-md">
+    <main className="relative flex flex-1 items-center justify-center px-6 py-16">
+      <HCard className="entry-card relative z-10 w-full max-w-md">
         <div className="mb-6 flex items-center gap-2.5">
           <Logo />
-          <h1 className="text-base font-semibold">Reset your password</h1>
+          <HText as="h1" variant="h2">
+            Reset your password
+          </HText>
         </div>
 
         {!submitted ? (
@@ -46,7 +43,7 @@ export default function ForgotPasswordPage() {
             <p className="text-sm text-muted">
               Enter your email and we&apos;ll send you a link to reset your password.
             </p>
-            <Input
+            <HInput
               label="Email"
               name="email"
               type="email"
@@ -56,23 +53,17 @@ export default function ForgotPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
-            {error && (
-              <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500">
-                {error}
-              </p>
-            )}
-            <Button type="submit" isLoading={isLoading} className="mt-1">
+            {error && <HCallout tone="danger">{error}</HCallout>}
+            <HButton type="submit" isLoading={isLoading} className="mt-1">
               Send reset link
-            </Button>
+            </HButton>
           </form>
         ) : (
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-500">
-                ✓
-              </span>
-              <p className="text-sm">If that email exists, a reset link is on its way.</p>
-            </div>
+            <HCallout tone="success">
+              <CheckIcon className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>If that email exists, a reset link is on its way.</span>
+            </HCallout>
             <p className="text-xs text-muted">
               We never reveal whether an email is registered. Check your inbox in a minute or two.
             </p>
@@ -84,7 +75,7 @@ export default function ForgotPasswordPage() {
             Back to sign in
           </Link>
         </p>
-      </Card>
+      </HCard>
     </main>
   );
 }

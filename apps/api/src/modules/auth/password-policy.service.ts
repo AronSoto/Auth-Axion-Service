@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ZxcvbnFactory } from '@zxcvbn-ts/core';
 import * as zxcvbnCommon from '@zxcvbn-ts/language-common';
+import * as zxcvbnEn from '@zxcvbn-ts/language-en';
 
 // zxcvbn scores 0–4; require "safely unguessable" or better.
 const MIN_SCORE = 3;
@@ -17,8 +18,10 @@ const HIBP_TIMEOUT_MS = 2500;
 export class PasswordPolicyService {
   private readonly logger = new Logger(PasswordPolicyService.name);
   private readonly zxcvbn = new ZxcvbnFactory({
-    dictionary: { ...zxcvbnCommon.dictionary },
+    dictionary: { ...zxcvbnCommon.dictionary, ...zxcvbnEn.dictionary },
     graphs: zxcvbnCommon.adjacencyGraphs,
+    // Without translations, feedback returns raw keys like "topTen".
+    translations: zxcvbnEn.translations,
   });
 
   async assertAcceptable(
