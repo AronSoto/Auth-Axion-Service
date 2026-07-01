@@ -83,7 +83,7 @@ function OverlayBody({ reason, onDismiss, autoRedirectMs = 6000, redirectTo = '/
 
       <div
         className="relative w-full max-w-md rounded-4xl border border-border bg-card p-10
-                   shadow-[var(--shadow-lg)]
+                   shadow-(--shadow-lg)
                    animate-panel-in"
       >
         <span
