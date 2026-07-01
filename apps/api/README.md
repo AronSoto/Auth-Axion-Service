@@ -27,26 +27,29 @@ src/
 │   ├── decorators/                @Public, @CurrentUser, @Roles
 │   ├── guards/                    JwtAuthGuard (global), RolesGuard (per-route)
 │   ├── filters/                   HttpExceptionFilter — uniform error envelope
-│   └── interceptors/              TransformInterceptor — { data, timestamp } envelope
+│   ├── interceptors/              TransformInterceptor — { data, timestamp } envelope
+│   └── logging/                   pino LoggerModule (JSON logs + request-id + redaction)
 │
 └── modules/
     ├── auth/                   ★ The point of the project
     │   ├── auth.controller.ts     Public + protected endpoints, all in Swagger
     │   ├── auth.service.ts        Orchestration of every auth flow
-    │   ├── token.service.ts       JWT signing + refresh-token rotation + reuse detection
-    │   ├── auth.types.ts          Shared shapes (AuthUser, OAuthProfile, JwtPayload)
+    │   ├── token.service.ts       JWT signing + refresh rotation + reuse detection + sessions
+    │   ├── password-policy.service.ts  zxcvbn strength + HaveIBeenPwned breach check
+    │   ├── auth.types.ts          Shared shapes (AuthUser, OAuthProfile, SessionInfo, …)
     │   ├── strategies/            local · jwt · google · github  (Passport.js)
-    │   ├── guards/                LocalAuthGuard + JwtAuthGuard + OAuth guards (return 503 when their provider isn't configured)
+    │   ├── guards/                Local + OAuth guards (state CSRF; 503 when unconfigured)
     │   └── dto/                   class-validator + class-transformer DTOs
     │
-    ├── users/                  Profile read/write
-    ├── admin/                  Admin-only counters (users, sessions, pending verifications)
+    ├── users/                  Profile read/write + failed-login lockout counters
+    ├── audit/                  Security audit log — AuditService writes SecurityEvent rows
+    ├── admin/                  Admin-only stats + recent security events
     ├── mail/                   Resend (prod) + Nodemailer/Mailtrap (dev), one MailService
     ├── tokens-cleanup/         Daily cron that prunes expired refresh + verification tokens (gated by ENABLE_CRON)
     └── health/                 /health and /health/ready (DB ping)
 ```
 
-The Prisma data model lives at [`prisma/schema.prisma`](./prisma/schema.prisma) and is the single source of truth for `User`, `Account`, `RefreshToken`, and `VerificationToken`.
+The Prisma data model lives at [`prisma/schema.prisma`](./prisma/schema.prisma) and is the single source of truth for `User`, `Account`, `RefreshToken`, `VerificationToken`, and `SecurityEvent`.
 
 ---
 
@@ -61,7 +64,8 @@ All routes are prefixed `/api`. Public means **no JWT required** (a global `JwtA
 | POST   | `/auth/refresh`              | cookie | Rotate refresh token, return a new access token.      |
 | POST   | `/auth/logout`               | public | Revoke the current refresh token, clear cookie.       |
 | POST   | `/auth/logout-all`           | bearer | Revoke every refresh token for the user.              |
-| GET    | `/auth/me`                   | bearer | Current authenticated user.                           |
+| GET    | `/auth/sessions`             | bearer | List active sessions/devices ("this device" flagged). |
+| DELETE | `/auth/sessions/:id`         | bearer | Revoke a single session (sign out one device).        |
 | GET    | `/auth/verify-email?token=…` | public | Consume verification token, mark email verified.      |
 | POST   | `/auth/resend-verification`  | public | Silent resend (no info leak).                         |
 | POST   | `/auth/forgot-password`      | public | Silent — sends reset email if account exists.         |
@@ -73,6 +77,7 @@ All routes are prefixed `/api`. Public means **no JWT required** (a global `JwtA
 | GET    | `/users/me`                  | bearer | Current user profile.                                 |
 | PATCH  | `/users/me`                  | bearer | Update profile (name, avatar).                        |
 | GET    | `/admin/stats`               | admin  | Operational counters (users, active sessions, …).     |
+| GET    | `/admin/security-events`     | admin  | Recent security audit events.                         |
 | GET    | `/health`                    | public | Liveness probe.                                       |
 | GET    | `/health/ready`              | public | Readiness probe (DB ping).                            |
 
@@ -133,6 +138,11 @@ A password change is a security-relevant event. We assume the user is doing it b
 - All "find by email" endpoints are silent: registration / forgot-password / resend-verification never leak whether an email exists.
 - Refresh-token **reuse detection**: replaying a revoked token wipes every active session for that user.
 - OAuth **account-takeover guard**: an unverified OAuth email cannot link to an existing local user.
+- **Account lockout**: 5 consecutive failed local logins temporarily lock the account (15 min); the counter resets on a successful login.
+- **Password policy** on register + reset: zxcvbn strength (min score 3) plus a HaveIBeenPwned k-anonymity breach lookup — only the SHA-1 prefix leaves the server, and it fails open if HIBP is unreachable.
+- **OAuth CSRF**: a one-time `state` cookie is issued when the flow starts and verified on the provider callback.
+- **Security audit log**: auth events (login, OAuth, reset, token-reuse, lockout, session revocation) are appended to a `SecurityEvent` table for traceability.
+- **Structured logging**: pino emits JSON logs with a per-request id and redacts `authorization` / `cookie` / password fields.
 
 ---
 
@@ -149,11 +159,13 @@ pnpm dev:api                     # starts on http://localhost:3000
 
 Open Swagger at <http://localhost:3000/api/docs>.
 
-### Generating JWT secrets
+### Generating the JWT secret
 
 ```bash
-openssl rand -base64 32          # run twice — different value for access + refresh
+openssl rand -base64 32          # value for JWT_ACCESS_SECRET
 ```
+
+Refresh tokens are opaque random strings (SHA-256 hashed), not JWTs — no separate secret needed.
 
 ---
 

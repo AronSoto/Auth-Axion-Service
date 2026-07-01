@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/Logo.png" alt="Auth Axion" width="400" />
+  <img src="docs/Axion.png" alt="Auth Axion" width="400" />
 </p>
 
 <p align="center">
@@ -33,18 +33,20 @@ Every concern (token rotation, OAuth account linking, email delivery, RBAC) live
 
 ## 🧱 Stack
 
-| Layer           | Tech                                                                                |
-| :-------------- | :---------------------------------------------------------------------------------- |
-| **Backend**     | NestJS 11, Passport.js, JWT (access + refresh rotation), Prisma 6, PostgreSQL 16    |
-| **Frontend**    | Next.js 16 (App Router), React 19, Tailwind CSS v4                                  |
-| **OAuth**       | Google, GitHub                                                                      |
-| **Email**       | Resend (prod) + Nodemailer / Mailtrap (dev)                                         |
-| **Validation**  | Zod (env), class-validator (DTOs)                                                   |
-| **Hardening**   | Helmet, CORS, @nestjs/throttler, role-based guards, secure cookies                  |
-| **Docs**        | Swagger / OpenAPI at `/api/docs`                                                    |
-| **Tests**       | Jest integration tests against Postgres — token rotation, OAuth linking, email gate |
-| **Tooling**     | pnpm workspaces, ESLint, Prettier, Husky, lint-staged, commitlint                   |
-| **Infra (dev)** | Docker Compose (Postgres 16-alpine)                                                 |
+| Layer             | Tech                                                                                                                                                                          |
+| :---------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Backend**       | NestJS 11, Passport.js, JWT (access + refresh rotation), Prisma 6, PostgreSQL 16                                                                                              |
+| **Frontend**      | Next.js 16 (App Router), React 19, Tailwind CSS v4                                                                                                                            |
+| **OAuth**         | Google, GitHub                                                                                                                                                                |
+| **Email**         | Resend (prod) + Nodemailer / Mailtrap (dev)                                                                                                                                   |
+| **Validation**    | Zod (env), class-validator (DTOs)                                                                                                                                             |
+| **Hardening**     | Argon2id, refresh rotation + reuse detection, account lockout, password breach check (HIBP), OAuth `state` CSRF, Helmet, CORS, @nestjs/throttler, RBAC guards, secure cookies |
+| **Observability** | Structured logging (pino, request-id), security audit log (`SecurityEvent`)                                                                                                   |
+| **Docs**          | Swagger / OpenAPI at `/api/docs`                                                                                                                                              |
+| **Tests**         | Jest integration tests against Postgres — token rotation, OAuth linking, email gate                                                                                           |
+| **CI**            | GitHub Actions — lint · typecheck · format · test · build (Postgres service)                                                                                                  |
+| **Tooling**       | pnpm workspaces, ESLint, Prettier, Husky, lint-staged, commitlint                                                                                                             |
+| **Infra (dev)**   | Docker Compose (Postgres 16-alpine)                                                                                                                                           |
 
 ---
 
@@ -65,6 +67,12 @@ Every concern (token rotation, OAuth account linking, email delivery, RBAC) live
 - **Coalesced silent refresh** on the web client — concurrent 401s share one `/auth/refresh` call, preventing self-inflicted reuse detection
 - **Session-expired overlay** — when refresh fails on a tab that had a session, a graceful full-screen message takes over instead of an abrupt redirect
 - **Cross-tab logout sync** via `BroadcastChannel` — logging out in one tab surfaces the expired overlay in every other open tab
+- **Active device / session management** — list every signed-in session and revoke one or all (`GET` / `DELETE /auth/sessions`), with "this device" detection by refresh-cookie hash
+- **Security audit log** — every auth event (login success/failure, OAuth, reset, token-reuse, lockout, session revocation) is recorded to a `SecurityEvent` table; admins read recent events via `/admin/security-events`
+- **Account lockout** — 5 failed local logins temporarily locks the account (15 min), on top of IP-based rate limiting
+- **Password strength + breach check** — zxcvbn strength scoring plus a HaveIBeenPwned k-anonymity lookup on register / reset (fails open if HIBP is unreachable)
+- **OAuth CSRF protection** — a one-time `state` cookie is issued on start and verified on the provider callback
+- **Structured logging** — pino JSON logs with a per-request id, redacting credentials and cookies
 
 ---
 
@@ -241,16 +249,22 @@ To send real emails in prod you also need to **verify a domain** in Resend (DNS 
 │   │   └── src/
 │   │       ├── config/       Zod-validated env
 │   │       ├── prisma/       PrismaService + module
-│   │       ├── common/       Guards, decorators, filters, interceptors
+│   │       ├── common/       Guards, decorators, filters, interceptors, pino logging
 │   │       └── modules/
-│   │           ├── auth/     ★ register, login, refresh, OAuth, email flows
-│   │           ├── users/    Profile read/write
+│   │           ├── auth/     ★ register, login, refresh, OAuth, sessions, password policy
+│   │           ├── users/    Profile read/write + lockout counters
+│   │           ├── audit/    Security audit log (SecurityEvent)
+│   │           ├── admin/    Admin-only stats + security events
 │   │           ├── mail/     Resend / Nodemailer dual driver
+│   │           ├── tokens-cleanup/  Daily cron pruning expired tokens
 │   │           └── health/   Liveness + readiness
 │   └── web/                  Next.js demo frontend     → @auth-axion/web
 │       └── src/
-│           ├── app/          App Router pages
-│           ├── components/   UI primitives + forms
+│           ├── app/          App Router pages + globals/tokens/base CSS
+│           ├── components/
+│           │   ├── ui/       Reusable primitives (HButton, HCard, HText, …)
+│           │   └── shared/   By concern (background, motion, auth, dashboard, feedback)
+│           ├── hooks/        Reusable hooks (use-page-entry)
 │           └── lib/          API client + auth context
 ├── docs/                     README assets (logo)
 ├── docker-compose.yml        Postgres 16-alpine container
