@@ -33,15 +33,19 @@ Every concern (token rotation, OAuth account linking, email delivery, RBAC) live
 
 <br />
 
-<img src="docs/screenshots/register.png" alt="Create account" align="right" width="45%" />
+<img src="docs/screenshots/register.png" alt="Create account" align="right" width="430" />
 
-**Create account.** Registration runs a live password policy — zxcvbn strength scoring plus a HaveIBeenPwned breach check reject weak or leaked passwords _before_ the account is created. A verification email is then sent to confirm ownership.
+**Create account.** Registration runs a live password policy — zxcvbn strength scoring plus a HaveIBeenPwned breach check reject weak or leaked passwords _before_ the account is ever created.
+
+A verification email is then sent to confirm ownership, and local login can be gated on it via the `REQUIRE_EMAIL_VERIFICATION` flag.
 
 <br clear="all" />
 
-<img src="docs/screenshots/forgot-password.png" alt="Password reset" align="left" width="45%" />
+<img src="docs/screenshots/forgot-password.png" alt="Password reset" align="left" width="430" />
 
-**Password reset.** Enter your email for a single-use reset link. The response is always identical, so it never reveals whether an account exists — and completing a reset revokes every active session as a precaution.
+**Password reset.** Enter your email to receive a single-use reset link. The response is always identical, so it never reveals whether an account is registered.
+
+Completing a reset revokes every active session — a password change is treated as a compromise signal, so every device has to sign in again.
 
 <br clear="all" />
 
