@@ -29,31 +29,23 @@ Every concern (token rotation, OAuth account linking, email delivery, RBAC) live
   <img src="docs/screenshots/landing.png" alt="Landing & sign in" width="880" />
 </p>
 
-<p align="center"><b>Landing &amp; sign in.</b> Split hero over an animated constellation. Email + password or one-click Google / GitHub OAuth — on success the API issues a short-lived access token plus an <code>httpOnly</code> refresh cookie.</p>
+<div align="center">
+  
+  ### Landing &amp; sign in
+  <p>Split hero over an animated constellation. Email + password or one-click Google / GitHub OAuth — on success the API issues a short-lived access token plus an <code>httpOnly</code> refresh cookie.</p>
+</div>
 
 <br />
-
-<img src="docs/screenshots/register.png" alt="Create account" align="right" width="430" />
-
-**Create account.** Registration runs a live password policy — zxcvbn strength scoring plus a HaveIBeenPwned breach check reject weak or leaked passwords _before_ the account is ever created.
-
-A verification email is then sent to confirm ownership, and local login can be gated on it via the `REQUIRE_EMAIL_VERIFICATION` flag.
-
-<br clear="all" />
-
-<img src="docs/screenshots/forgot-password.png" alt="Password reset" align="left" width="430" />
-
-**Password reset.** Enter your email to receive a single-use reset link. The response is always identical, so it never reveals whether an account is registered.
-
-Completing a reset revokes every active session — a password change is treated as a compromise signal, so every device has to sign in again.
-
-<br clear="all" />
 
 <p align="center">
   <img src="docs/screenshots/dashboard.png" alt="Dashboard" width="880" />
 </p>
 
-<p align="center"><b>Dashboard.</b> Identity, role &amp; verification badges, a copy-able user id, and active-device management — list every signed-in session and revoke any of them.</p>
+<div align="center">
+  
+  ### Dashboard
+  <p>Split hero over an animated constellation. Email + password or one-click Google / GitHub OAuth — on success the API issues a short-lived access token plus an <code>httpOnly</code> refresh cookie.</p>
+</div>
 
 ---
 
