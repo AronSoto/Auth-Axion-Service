@@ -56,7 +56,7 @@ function LandingPageContent() {
         <section>
           <div className="hero-badge mb-8 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted">
             <span className="live-dot h-1.5 w-1.5 rounded-full bg-success" />
-            Auth backend live · NestJS · v1.2
+            Auth Live · v3.0
           </div>
 
           <h1 className="text-4xl font-semibold tracking-tighter sm:text-5xl lg:text-[3.5rem] lg:leading-[1.03]">
